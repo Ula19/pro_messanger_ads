@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-k$z=ttus)1@dk7s608zz-5o)0r=6$za7r7gv$n2o1axt_irpme
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    'corsheaders',
     'rest_framework',
     'drf_spectacular',
     'rest_framework_simplejwt',
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -107,6 +109,31 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+CORS_ALLOW_ALL_ORIGINS = True
+# Разрешаем куки (если нужна авторизация)
+CORS_ALLOW_CREDENTIALS = True
+# Разрешаем все заголовки (для разработки)
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+# Разрешаем все методы HTTP
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
 # REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -120,8 +147,8 @@ REST_FRAMEWORK = {
 
 # JWT Settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
 }
@@ -132,6 +159,15 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API for managing channels and orders',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    # "SWAGGER_UI_SETTINGS": {
+    #     "persistAuthorization": True,  # не сбрасывать авторизацию
+    # },
+
+    # # Автоматическое определение типов для SerializerMethodField
+    # 'POSTPROCESSING_HOOKS': [
+    #     'drf_spectacular.hooks.postprocess_schema_enums',
+    #     'drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields',
+    # ],
 }
 
 
@@ -140,7 +176,7 @@ SPECTACULAR_SETTINGS = {
 
 LANGUAGE_CODE = 'ru'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Tashkent'
 
 USE_I18N = True
 
@@ -159,8 +195,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 {
-  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2NTY5MDczOSwiaWF0IjoxNzY1NjA0MzM5LCJqdGkiOiI0OTk3MTYyOTkzMjQ0NDJlOTQyN2ZlOWU2NWMyYWNhNiIsInVzZXJfaWQiOiIxIn0.AawV8Rkr79jd1S51bBb88IF_FXSAu0GVwo3piAMTRmM",
-  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY1NjA3OTM5LCJpYXQiOjE3NjU2MDQzMzksImp0aSI6IjVmMDBiNTdlYjg0MDRiYzc5Njg5YjU4ZDgxMjJiYWMxIiwidXNlcl9pZCI6IjEifQ.Ix6Mn9a67oDWdn-SRBVKLZlKj0ljn4cP22oqc4QJvLI",
-  "user_id": "f5fd1228-b960-46a1-abaa-5cc9ca0647c2",
-  "username": "ulugbek"
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2NjQwMTAwNCwiaWF0IjoxNzY1Nzk2MjA0LCJqdGkiOiJlODY1NzU2OThjMzA0ZGVlOGQxZWY5ZDU5YTBmNzAzZCIsInVzZXJfaWQiOiIxIn0.30cNsy0sCxyySnzwY0by5tO8FGhpGP90gw5rdfnF3Hc",
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY1ODgyNjA0LCJpYXQiOjE3NjU3OTYyMDQsImp0aSI6IjYwYzQ5NzBmOGRhMzRmZDdiNzU2ZjkzZmJiZWM0Y2JkIiwidXNlcl9pZCI6IjEifQ.KIrMDeAY1xsx15vKDx1KtL0aYqm4vr7HSTlOKLOUlOg",
+  "user_id": "97e31fc1-5544-43dd-822e-fdee33910c54",
+  "username": "admin"
 }
