@@ -24,7 +24,7 @@ urlpatterns = [
     # Отмена заказа
     path('orders/<int:order_id>/cancel/', CancelOrderView.as_view(), name='cancel_order'),
 
-    # Поиск и показ рекламы
+    # Поиск каналов по тегу
     path('search/', SearchChannelsView.as_view(), name='search-channels'),
 
     # Статистика канала

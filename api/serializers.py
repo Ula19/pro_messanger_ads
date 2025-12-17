@@ -318,3 +318,10 @@ class DepositSerializer(serializers.Serializer):
         if data['amount'] <= 0:
             raise serializers.ValidationError({"amount": "Сумма должна быть больше 0"})
         return data
+
+
+class SearchResultSerializer(serializers.Serializer):
+    """Сериализатор для результата поиска"""
+    channel_id = serializers.CharField()
+    channel_name = serializers.CharField()
+    order_id = serializers.CharField()
