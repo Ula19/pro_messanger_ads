@@ -202,9 +202,17 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 {
-  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2NjU1MzAwMSwiaWF0IjoxNzY1OTQ4MjAxLCJqdGkiOiI5ZjMzMTZiOTFmYTQ0YTIxYjY4NzI2YzY1MjI1Y2M3YSIsInVzZXJfaWQiOiIxIn0.DJaW5d0k7C50p0y73J09r59gl6AnszZNd4LPhz1Wv28",
-  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY2MDM0NjAxLCJpYXQiOjE3NjU5NDgyMDEsImp0aSI6ImUwMTM2NzljNDc3OTQwOWViMjJhYzFhNDFkMjU4YTg2IiwidXNlcl9pZCI6IjEifQ.JosSRFLv_RV_biwflNX86jHEPYNbr1CBJvcXyMFKzAU",
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2NjU3MzUzMCwiaWF0IjoxNzY1OTY4NzMwLCJqdGkiOiJlMGMzYzhhOTljNGU0MTE4OTViMTc1ZmJlNDA3NjE5NyIsInVzZXJfaWQiOiIyIn0.wCiwJiW3VQSbWz9_tEWrbMy9EFRytOz6cJeORRf0gjY",
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY2MDU1MTMwLCJpYXQiOjE3NjU5Njg3MzAsImp0aSI6ImFmYjBiMjZkNWVkZjQ4Y2NiM2JkNjY4ZWI5NzZkOTk2IiwidXNlcl9pZCI6IjIifQ.rTyj-0_QgwNkBuSIT9nuouX_EhFmaoNZouq2mMC4nZo",
+  "user_id": "954537e0-8308-40b4-b3d3-70579ef887a5",
+  "username": "ulugbek",
+  "is_admin": 'false'
+}
+
+{
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2NjU3NDIwMCwiaWF0IjoxNzY1OTY5NDAwLCJqdGkiOiI2MTIyYzNlZDJiOTg0NTU3OWNkZWZjNDExNjYxNTI3MyIsInVzZXJfaWQiOiIxIn0.zKSEYd30EV6a6n-e_E60ud9jxEd17a_51JzvXt8EAZw",
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY2MDU1ODAwLCJpYXQiOjE3NjU5Njk0MDAsImp0aSI6ImVmM2RjMjFmMTBhZjQ0ZjRiZmZlMTJmOTRlMmVkOTYxIiwidXNlcl9pZCI6IjEifQ.kJ4Pobyey8hmpFr5LdhvPrUT8qLVm7DPE7klRSj6ptE",
   "user_id": "439e22b3-1a47-461f-a0fb-42ca9c0eaa55",
   "username": "admin",
-  "is_admin": 'false'
+  "is_admin": 'true'
 }

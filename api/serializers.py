@@ -115,7 +115,8 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'channel_id', 'channel_name', 'order_name', 'tags', 'tag_names',
             'spm', 'budget', 'total_views', 'shown_views', 'remaining_views',
-            'completed', 'cancelled', 'is_active', 'created_at', 'updated_at'
+            'completed', 'cancelled', 'is_active', 'max_views_per_user',
+            'created_at', 'updated_at'
         ]
         read_only_fields = [
             'created_at', 'updated_at', 'tags', 'total_views',
@@ -189,8 +190,13 @@ class OrderListSerializer(serializers.ModelSerializer):
             'tags', 'channel_tags', 'spm', 'budget',
             'total_views', 'shown_views', 'remaining_views',
             'completed', 'cancelled', 'is_active', 'refund_amount',
+            'max_views_per_user',
             'created_at'
         ]
+
+    def get_user_views_count(self, obj):
+        """Получаем количество пользователей, которые просмотрели рекламу"""
+        return obj.ad_views.count()
 
     def get_tags(self, obj):
         """Получаем только имена тегов заказа"""
@@ -216,6 +222,7 @@ class ChannelOrderSerializer(serializers.Serializer):
     order_name = serializers.CharField(max_length=255, required=True)
     spm = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
     budget = serializers.DecimalField(max_digits=15, decimal_places=2, required=True)
+    is_active = serializers.BooleanField(default=True)
 
     def validate(self, data):
         if data['spm'] <= 0:
@@ -265,6 +272,7 @@ class ChannelOrderSerializer(serializers.Serializer):
             order_name=validated_data['order_name'],
             spm=validated_data['spm'],
             budget=validated_data['budget'],
+            is_active=validated_data['is_active']
         )
 
         # Сохраняем теги во временный атрибут
@@ -325,3 +333,9 @@ class SearchResultSerializer(serializers.Serializer):
     channel_id = serializers.CharField()
     channel_name = serializers.CharField()
     order_id = serializers.CharField()
+
+
+class SearchRequestSerializer(serializers.Serializer):
+    """Сериализатор для запроса поиска"""
+    tag = serializers.CharField(required=True)
+    viewer_id = serializers.CharField(required=True, help_text='ID пользователя, который ищет канал')

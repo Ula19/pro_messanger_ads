@@ -144,6 +144,11 @@ class Order(models.Model):
         default=0,
         help_text='Оставшееся количество показов'
     )
+    max_views_per_user = models.PositiveIntegerField(
+        verbose_name='Максимальное количество показов одному пользователю',
+        default=1,
+        help_text='Сколько раз можно показать эту рекламу одному пользователю'
+    )
 
     # Статусы
     completed = models.BooleanField(
@@ -210,7 +215,7 @@ class Order(models.Model):
             # Удаляем временный атрибут после использования
             delattr(self, '_tag_names')
 
-    def decrement_views(self):
+    def decrement_views(self, viewer_id=None):
         """Уменьшает количество оставшихся показов на 1"""
         if self.remaining_views > 0 and not self.cancelled:
             self.shown_views += 1
@@ -253,7 +258,55 @@ class Order(models.Model):
             return (Decimal(self.remaining_views) / Decimal(1000)) * self.spm
         return 0
 
-    # user_budget
+
+class AdView(models.Model):
+    """Модель для отслеживания показов рекламы конкретным пользователям"""
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name='ad_views',
+        verbose_name='Заказ'
+    )
+    viewer_id = models.CharField(
+        verbose_name='ID пользователя (зрителя)',
+        max_length=255,
+        help_text='ID пользователя, которому показывается реклама'
+    )
+    view_count = models.PositiveIntegerField(
+        verbose_name='Количество просмотров',
+        default=0,
+        help_text='Сколько раз этому пользователю уже показали эту рекламу'
+    )
+    last_viewed_at = models.DateTimeField(
+        verbose_name='Последний просмотр',
+        auto_now=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Показ рекламы'
+        verbose_name_plural = 'Показы рекламы'
+        unique_together = ['order', 'viewer_id']  # Одна запись на заказ и пользователя
+        indexes = [
+            models.Index(fields=['viewer_id', 'order']),
+            models.Index(fields=['last_viewed_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.viewer_id} - {self.order.order_name} ({self.view_count})"
+
+    def can_view_more(self, max_views):
+        """Проверяет, можно ли показать еще рекламу этому пользователю"""
+        return self.view_count < max_views
+
+    def increment_view(self):
+        """Увеличивает счетчик просмотров"""
+        self.view_count += 1
+        self.save()
+        return True
+
+
+# user_budget
     # Реализовать функцию cancel. Может прийти запрос, чтобы завершить рекламу до закачивания количества просмотров.
     # И в этот момент
     # мы должны вернуть пользователю его деньги. В Первым Post запросе, нам будет приходит остаток денег пользователя
@@ -276,7 +329,7 @@ class Order(models.Model):
     # DONE ^^^^^^^^
 
     # Нужно добавить функцию Где при оформление ордера, пользователь сможет выбрать сколько раз одному пользователю
-    # показать данный канал при поиске. Проще говоря, когда в приложение юзер вводит тег канала который ищет, и при
+    # показать данный канал при поиске. Проще говоря, когда в приложение юзер вводит тег канала которого ищет, и при
     # нахождение подходящего канала чтобы ему вывелось тот канал который нашел в бд. И при повторном запросе этим же
     # пользователем этого же тега мы должны показать ему то количество раз этот канал сколько раз указал при заказе
     # ордера.

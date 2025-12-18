@@ -11,7 +11,7 @@ from django.db.models import Q, Max, Subquery, OuterRef
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.search import TrigramSimilarity
 
-from .models import Channel, Order, Tag, Balance
+from .models import Channel, Order, Tag, Balance, AdView
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, ChannelOrderSerializer,
     UserProfileSerializer, OrderSerializer, ChannelStatsSerializer,
@@ -187,7 +187,7 @@ class ChannelStatsView(generics.RetrieveAPIView):
 
 class StandardResultsSetPagination(PageNumberPagination):
     """Пагинация для списков"""
-    page_size = 20
+    page_size = 5
     page_size_query_param = 'page_size'
     max_page_size = 100
 
@@ -245,181 +245,121 @@ class ChannelOrderListView(generics.ListAPIView):
         ).select_related('channel_id').prefetch_related('tags', 'channel_id__tags')
 
 
-from django.db import transaction
-
-
 class SearchChannelsView(generics.GenericAPIView):
-    """Поиск каналов по тегу (двухэтапный: точный + триграммный)"""
-    permission_classes = [permissions.AllowAny]
+    """Поиск каналов по тегу с учетом лимита показов на пользователя"""
     serializer_class = SearchResultSerializer
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         tag = request.data.get('tag', '').strip().lower()
+        viewer_id = request.data.get('viewer_id', '').strip()
 
-        if not tag:
+        if not tag or not viewer_id:
             return Response(
-                {'error': 'Параметр tag обязателен'},
+                {'error': 'Не указаны обязательные параметры: tag и viewer_id'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        try:
-            # ЭТАП 1: Точный поиск по тегу канала
-            channel_with_tag = self._find_channel_by_exact_tag(tag)
+        # Пробуем найти подходящий заказ для показа
+        result = self._find_suitable_order(tag, viewer_id)
 
-            if channel_with_tag:
-                # Нашли по точному совпадению - увеличиваем просмотры и возвращаем результат
-                return self._process_channel(channel_with_tag, tag, "exact")
-
-            # ЭТАП 2: Триграммный поиск (только если точный не нашел)
-            similar_channel = self._find_channel_by_similar_tag(tag)
-
-            if similar_channel:
-                # Нашли по триграммному сходству - увеличиваем просмотры и возвращаем результат
-                return self._process_channel(similar_channel, tag, "similar")
-
-            # Если оба поиска ничего не нашли
+        if result:
+            return Response(result, status=status.HTTP_200_OK)
+        else:
             return Response(
-                {'error': 'Канал с таким тегом не найден'},
+                {'error': 'Нет доступной рекламы по данному тегу для вашего пользователя'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        except Exception as e:
-            return Response(
-                {'error': f'Ошибка при поиске: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-    def _process_channel(self, channel, tag, search_type):
-        """Обработка найденного канала: увеличение просмотров и возврат результата"""
+    def _find_suitable_order(self, tag_name, viewer_id):
+        """Поиск подходящего заказа для показа"""
+        # Сначала ищем точное совпадение тега
         try:
-            # Находим активный заказ этого канала с максимальным SPM
-            active_order = Order.objects.filter(
-                channel_id=channel,
-                is_active=True,
-                cancelled=False,
-                remaining_views__gt=0
-            ).order_by('-spm').first()
-
-            if not active_order:
-                return Response(
-                    {'error': f'Нет активной рекламы для канала {channel.channel_name}'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-
-            # Атомарно увеличиваем счетчик просмотров
-            with transaction.atomic():
-                # Блокируем запись заказа для избежания гонки
-                order = Order.objects.select_for_update().get(pk=active_order.pk)
-
-                if order.remaining_views > 0 and not order.cancelled:
-                    # Увеличиваем счетчик просмотров
-                    order.decrement_views()  # Этот метод уже уменьшает remaining_views и увеличивает shown_views
-
-                    return Response({
-                        'channel_id': channel.channel_id,
-                        'channel_name': channel.channel_name,
-                        'order_id': order.id,
-                    }, status=status.HTTP_200_OK)
-                else:
-                    # Если лимит исчерпан, деактивируем заказ
-                    order.is_active = False
-                    order.save()
-
-                    # Пробуем найти другой активный заказ для этого канала
-                    other_active_order = Order.objects.filter(
-                        channel_id=channel,
-                        is_active=True,
-                        cancelled=False,
-                        remaining_views__gt=0
-                    ).order_by('-spm').first()
-
-                    if other_active_order:
-                        # Рекурсивно обрабатываем другой заказ
-                        return self._process_channel(channel, tag, search_type)
-
-                    return Response(
-                        {'error': f'Все заказы для канала {channel.channel_name} исчерпаны'},
-                        status=status.HTTP_410_GONE
-                    )
-
-        except Exception as e:
-            return Response(
-                {'error': f'Ошибка при обработке канала: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-    def _find_channel_by_exact_tag(self, tag_name):
-        """Поиск канала по точному совпадению тега с максимальным SPM"""
-        try:
-            # Находим тег по точному совпадению
             tag_obj = Tag.objects.get(name=tag_name)
-
-            # Находим каналы с этим тегом
-            channels_with_tag = Channel.objects.filter(tags=tag_obj)
-
-            if not channels_with_tag.exists():
-                return None
-
-            # Для каждого канала находим максимальный SPM среди активных заказов
-            from django.db.models import Subquery, OuterRef
-
-            # Подзапрос для нахождения максимального SPM среди активных заказов канала
-            max_spm_subquery = Order.objects.filter(
-                channel_id=OuterRef('pk'),
-                is_active=True,
-                cancelled=False,
-                remaining_views__gt=0
-            ).order_by('-spm').values('spm')[:1]
-
-            # Аннотируем каналы максимальным SPM
-            channels_annotated = channels_with_tag.annotate(
-                max_spm=Subquery(max_spm_subquery)
-            ).filter(max_spm__isnull=False).order_by('-max_spm')
-
-            if channels_annotated.exists():
-                # Возвращаем канал с максимальным SPM
-                return channels_annotated.first()
-
-            return None
-
+            orders = self._get_sorted_orders_by_tag(tag_obj)
+            return self._process_orders(orders, viewer_id, "exact")
         except Tag.DoesNotExist:
-            return None
+            pass
 
-    def _find_channel_by_similar_tag(self, tag_name, threshold=0.3):
-        """Поиск канала по триграммному сходству тега"""
-        # Находим похожие теги по триграммному сходству
-        similar_tags = Tag.find_similar_tags(tag_name, threshold=threshold)
+        # Если точного тега нет, ищем похожие теги
+        similar_tags = Tag.find_similar_tags(tag_name, threshold=0.3)
 
-        if not similar_tags.exists():
-            return None
+        for similar_tag in similar_tags:
+            orders = self._get_sorted_orders_by_tag(similar_tag)
+            result = self._process_orders(orders, viewer_id, "similar")
+            if result:
+                return result
 
-        # Берем самый похожий тег
-        similar_tag = similar_tags.first()
+        return None
 
-        # Находим каналы с этим похожим тегом
-        channels_with_similar_tag = Channel.objects.filter(tags=similar_tag)
-
-        if not channels_with_similar_tag.exists():
-            return None
-
-        # Для каждого канала находим максимальный SPM среди активных заказов
-        from django.db.models import Subquery, OuterRef
-
-        # Подзапрос для нахождения максимального SPM
-        max_spm_subquery = Order.objects.filter(
-            channel_id=OuterRef('pk'),
+    def _get_sorted_orders_by_tag(self, tag_obj):
+        """Получает активные заказы с тегом, отсортированные по SPM"""
+        return Order.objects.filter(
+            tags=tag_obj,
             is_active=True,
             cancelled=False,
             remaining_views__gt=0
-        ).order_by('-spm').values('spm')[:1]
+        ).select_related('channel_id').order_by('-spm')
 
-        # Аннотируем каналы максимальным SPM
-        channels_annotated = channels_with_similar_tag.annotate(
-            max_spm=Subquery(max_spm_subquery)
-        ).filter(max_spm__isnull=False).order_by('-max_spm')
+    def _process_orders(self, orders, viewer_id, search_type):
+        """Обрабатывает список заказов, находит подходящий для показа"""
+        for order in orders:
+            # Пытаемся показать рекламу
+            success = self._try_show_ad_to_user(order, viewer_id)
 
-        if channels_annotated.exists():
-            # Возвращаем канал с максимальным SPM
-            return channels_annotated.first()
+            if success:
+                # Получаем обновленные данные о просмотрах пользователя
+                ad_view = AdView.objects.get(order=order, viewer_id=viewer_id)
+
+                return {
+                    'channel_id': order.channel_id.channel_id,
+                    'channel_name': order.channel_id.channel_name,
+                    'order_id': order.id,
+                    'spm': order.spm
+                }
 
         return None
+
+    def _try_show_ad_to_user(self, order, viewer_id):
+        """Пытается показать рекламу пользователю"""
+        try:
+            with transaction.atomic():
+                # Блокируем заказ для безопасного обновления
+                order_lock = Order.objects.select_for_update().get(pk=order.pk)
+
+                # Проверяем, можно ли показывать заказ
+                if (order_lock.remaining_views <= 0 or
+                        order_lock.cancelled or
+                        not order_lock.is_active):
+                    return False
+
+                # Получаем или создаем запись о просмотрах пользователя
+                ad_view, created = AdView.objects.get_or_create(
+                    order=order_lock,
+                    viewer_id=viewer_id,
+                    defaults={'view_count': 0}
+                )
+
+                # Проверяем лимит показов для пользователя
+                if ad_view.view_count >= order_lock.max_views_per_user:
+                    return False  # Лимит исчерпан
+
+                # Обновляем счетчики заказа
+                order_lock.shown_views += 1
+                order_lock.remaining_views -= 1
+
+                if order_lock.remaining_views == 0:
+                    order_lock.completed = True
+                    order_lock.is_active = False
+
+                order_lock.save()
+
+                # Обновляем счетчик просмотров пользователя
+                ad_view.view_count += 1
+                ad_view.save()
+
+                return True
+
+        except Exception as e:
+            print(f"Ошибка при показе рекламы: {e}")
+            return False

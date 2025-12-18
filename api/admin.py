@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import CustomUser, Channel, Order, Balance
+from .models import CustomUser, Channel, Order, Balance, AdView
 
 
 # @admin.register(CustomUser)
@@ -10,6 +10,10 @@ from .models import CustomUser, Channel, Order, Balance
 #     readonly_fields = ('user_id', 'date_joined')
 
 @admin.register(CustomUser)
+class UserAdmin(admin.ModelAdmin):
+    pass
+
+@admin.register(AdView)
 class UserAdmin(admin.ModelAdmin):
     pass
 
