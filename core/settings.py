@@ -202,9 +202,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 {
-  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2NjU3MzUzMCwiaWF0IjoxNzY1OTY4NzMwLCJqdGkiOiJlMGMzYzhhOTljNGU0MTE4OTViMTc1ZmJlNDA3NjE5NyIsInVzZXJfaWQiOiIyIn0.wCiwJiW3VQSbWz9_tEWrbMy9EFRytOz6cJeORRf0gjY",
-  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY2MDU1MTMwLCJpYXQiOjE3NjU5Njg3MzAsImp0aSI6ImFmYjBiMjZkNWVkZjQ4Y2NiM2JkNjY4ZWI5NzZkOTk2IiwidXNlcl9pZCI6IjIifQ.rTyj-0_QgwNkBuSIT9nuouX_EhFmaoNZouq2mMC4nZo",
-  "user_id": "954537e0-8308-40b4-b3d3-70579ef887a5",
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2Njc0OTk0MiwiaWF0IjoxNzY2MTQ1MTQyLCJqdGkiOiI5OGYzMmNmNTBjNzk0N2MzYjQxZjExZjI0YWQ3MmRmMiIsInVzZXJfaWQiOiIzIn0.92zqRHyOMdyCKyc37H3A94_Epi35bV4q4WQGXn-qX4A",
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY2MjMxNTQyLCJpYXQiOjE3NjYxNDUxNDIsImp0aSI6IjhmNDE2ZTVmOTM2YTRmNzNiZjIwYzM3MWQyYjY0NjhhIiwidXNlcl9pZCI6IjMifQ.8e12YKKop62MvWDTs0_F6Sm_rGUIAKiZ7UgkWA8jO20",
+  "user_id": "f67c58da-8112-41d7-b05c-0d25f6b2d70f",
   "username": "ulugbek",
   "is_admin": 'false'
 }
