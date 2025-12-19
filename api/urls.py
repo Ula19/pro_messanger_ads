@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 from .views import UserProfileView, UserLoginView, UserRegistrationView, CreateChannelOrderView, SearchChannelsView, \
     ChannelStatsView, OrderListView, ActiveOrderListView, ChannelOrderListView, BalanceView, DepositView, \
-    CancelOrderView, UserTokenVerifyView
+    CancelOrderView, UserTokenVerifyView, OrderActivationView
 
 urlpatterns = [
     # Регистрация и аутентификация
@@ -27,11 +27,14 @@ urlpatterns = [
     # Поиск каналов по тегу
     path('search/', SearchChannelsView.as_view(), name='search-channels'),
 
-    # Статистика канала
+    # Статистика канала  ЭТОТ КОД НЕ НУЖЕН. НУЖНО УБРАТЬ ВСЕ ЧТО С НИМ СВЯЗАНО
     path('stats/<str:channel_id>/', ChannelStatsView.as_view(), name='channel-stats'),
 
     # Списки заказов
     path('orders/all/', OrderListView.as_view(), name='all-orders'),
     path('orders/active/', ActiveOrderListView.as_view(), name='active-orders'),
+    path('orders/status/', OrderActivationView.as_view(), name='order_activation'),
+
+    # ЭТОТ КОД НЕ НУЖЕН. НУЖНО УБРАТЬ ВСЕ ЧТО С НИМ СВЯЗАНО
     path('orders/channel/<str:channel_id>/', ChannelOrderListView.as_view(), name='channel-orders'),
 ]

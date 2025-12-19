@@ -211,6 +211,77 @@ class OrderListSerializer(serializers.ModelSerializer):
         return obj.get_refund_amount()
 
 
+class OrderActivationSerializer(serializers.Serializer):
+    """Сериализатор для активации/деактивации заказа"""
+    order_id = serializers.IntegerField(required=True)
+    is_active = serializers.BooleanField(required=True)
+
+    def validate(self, data):
+        """
+        Валидация данных активации заказа
+        """
+        request = self.context.get('request')
+        user = request.user
+        order_id = data['order_id']
+        is_active = data['is_active']
+
+        try:
+            # Проверяем, существует ли заказ
+            order = Order.objects.get(id=order_id)
+
+            # Проверяем, принадлежит ли заказ текущему пользователю
+            if order.user != user:
+                raise serializers.ValidationError({
+                    "error": "У вас нет прав для изменения этого заказа"
+                })
+
+            # Сохраняем order в данных для использования во view
+            data['order'] = order
+
+            # Проверяем, можно ли изменять статус
+            validation_errors = self._validate_order_status(order, is_active)
+            if validation_errors:
+                raise serializers.ValidationError(validation_errors)
+
+        except Order.DoesNotExist:
+            raise serializers.ValidationError({
+                "error": "Заказ с указанным ID не найден"
+            })
+
+        return data
+
+    def _validate_order_status(self, order, new_is_active):
+        """
+        Проверка возможности изменения статуса заказа
+        """
+        errors = {}
+
+        # Проверяем, не отменен ли заказ
+        if order.cancelled:
+            errors['error'] = "Невозможно изменить статус отмененного заказа"
+            return errors
+
+        # Проверяем, не завершен ли заказ
+        if order.completed:
+            errors['error'] = "Невозможно изменить статус завершенного заказа"
+            return errors
+
+        # Если пытаемся установить тот же статус
+        if order.is_active == new_is_active:
+            status_text = "активен" if new_is_active else "неактивен"
+            errors['warning'] = f"Заказ уже {status_text}"
+
+        # Если пытаемся активировать заказ без оставшихся просмотров
+        if new_is_active and order.remaining_views <= 0:
+            errors['error'] = "Невозможно активировать заказ без оставшихся просмотров"
+
+        # Если пытаемся активировать заказ с нулевым бюджетом
+        if new_is_active and order.budget <= 0:
+            errors['error'] = "Невозможно активировать заказ с нулевым бюджетом"
+
+        return errors
+
+
 class ChannelOrderSerializer(serializers.Serializer):
     """Сериализатор для создания канала и заказа"""
     # Поля канала

@@ -16,7 +16,7 @@ from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, ChannelOrderSerializer,
     UserProfileSerializer, OrderSerializer, ChannelStatsSerializer,
     SearchResponseSerializer, OrderListSerializer, BalanceSerializer,
-    CancelOrderSerializer, DepositSerializer, SearchResultSerializer
+    CancelOrderSerializer, DepositSerializer, SearchResultSerializer, OrderActivationSerializer
 )
 
 User = get_user_model()
@@ -203,6 +203,83 @@ class OrderListView(generics.ListAPIView):
         return Order.objects.filter(
             user=self.request.user
         ).select_related('channel_id').prefetch_related('tags', 'channel_id__tags')
+
+
+class OrderActivationView(generics.GenericAPIView):
+    """
+    Активация/деактивация заказа по ID
+    Получает order_id и is_active в теле POST запроса
+    """
+    serializer_class = OrderActivationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """
+        Обработка POST запроса для активации/деактивации заказа
+        """
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        # Получаем данные из сериализатора
+        order = serializer.validated_data['order']
+        is_active = serializer.validated_data['is_active']
+
+        # Если есть warning (например, статус уже такой же), возвращаем его
+        if 'warning' in serializer.validated_data:
+            return Response({
+                'message': serializer.validated_data['warning'],
+                'order_id': order.id,
+                'current_status': order.is_active,
+                'requested_status': is_active
+            }, status=status.HTTP_200_OK)
+
+        # Используем атомарную транзакцию для безопасности
+        with transaction.atomic():
+            # Блокируем заказ для предотвращения race conditions
+            locked_order = Order.objects.select_for_update().get(id=order.id)
+
+            # Сохраняем старый статус
+            old_status = locked_order.is_active
+
+            # Обновляем статус
+            locked_order.is_active = is_active
+
+            # Дополнительная логика при активации
+            if is_active:
+                # Проверяем, не израсходованы ли все просмотры
+                if locked_order.remaining_views <= 0:
+                    return Response({
+                        'error': 'Невозможно активировать заказ: все просмотры израсходованы'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                # Если заказ был деактивирован, но не завершен и не отменен
+                # Убедимся, что completed установлен правильно
+                if locked_order.remaining_views == 0 and not locked_order.completed:
+                    locked_order.completed = True
+                    locked_order.is_active = False
+
+            # При деактивации просто меняем статус
+            # Заказ уже проверен на отмену и завершение в сериализаторе
+
+            locked_order.save()
+
+        # Формируем ответ
+        response_data = {
+            'message': f'Статус заказа успешно изменен с {old_status} на {is_active}',
+            'order': {
+                'id': order.id,
+                'order_name': order.order_name,
+                'is_active': order.is_active,
+                'old_status': old_status,
+                'new_status': is_active,
+                'remaining_views': order.remaining_views,
+                'completed': order.completed,
+                'cancelled': order.cancelled,
+                'channel_name': order.channel_name
+            }
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class ActiveOrderListView(generics.ListAPIView):
