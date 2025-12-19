@@ -110,26 +110,43 @@ class CreateChannelOrderView(generics.CreateAPIView):
 
 
 class CancelOrderView(generics.GenericAPIView):
-    """Отмена заказа и возврат средств"""
-    serializer_class = CancelOrderSerializer
+    """Отмена заказа по ID в URL"""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, order_id):
+        """
+        Отменяет заказ пользователя.
+        Получает order_id из параметра пути URL.
+        """
         try:
-            # Получаем заказ пользователя
-            order = Order.objects.get(id=order_id, user=request.user)
+            # Все операции с базой данных, включая выборку с блокировкой и обновление,
+            # должны быть внутри ОДНОЙ транзакции.
+            with transaction.atomic():
+                # 1. Находим заказ и проверяем права доступа
+                # select_for_update() блокирует строку заказа для других транзакций,
+                # что гарантирует целостность при конкурентном доступе.
+                order = Order.objects.select_for_update().get(id=order_id, user=request.user)
 
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
+                # 2. Валидация состояния заказа перед отменой
+                validation_error = self._validate_order_for_cancellation(order)
+                if validation_error:
+                    # Если валидация не прошла, транзакция откатится сама
+                    return Response(
+                        {'error': validation_error},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
-            # Отменяем заказ и получаем сумму возврата
-            refund_amount = order.cancel_order()
+                # 3. Выполняем отмену. Метод cancel_order() вызывает order.save()
+                refund_amount = order.cancel_order()
 
+            # 4. Возвращаем успешный ответ ВНЕ транзакции
             return Response({
-                'message': 'Заказ успешно отменен',
+                'message': 'Заказ успешно отменен.',
                 'refund_amount': refund_amount,
                 'new_balance': request.user.balance.amount,
                 'order_status': {
+                    'id': order.id,
+                    'order_name': order.order_name,
                     'cancelled': order.cancelled,
                     'is_active': order.is_active,
                     'remaining_views': order.remaining_views
@@ -137,10 +154,19 @@ class CancelOrderView(generics.GenericAPIView):
             }, status=status.HTTP_200_OK)
 
         except Order.DoesNotExist:
+            # Этот блок находится вне транзакции, так как исключение выбрасывается при запросе
             return Response(
-                {'error': 'Заказ не найден или у вас нет прав на его отмену'},
+                {'error': 'Заказ не найден или у вас нет прав на его отмену.'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+    def _validate_order_for_cancellation(self, order):
+        """Проверяет, можно ли отменить заказ."""
+        if order.cancelled:
+            return 'Заказ уже отменен.'
+        if order.completed:
+            return 'Нельзя отменить завершенный заказ.'
+        return None
 
 
 class ChannelStatsView(generics.RetrieveAPIView):
