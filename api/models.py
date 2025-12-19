@@ -115,35 +115,18 @@ class Order(models.Model):
     tags = models.ManyToManyField(Tag, related_name='orders', blank=True, verbose_name='Tags')
 
     # Параметры заказа
-    spm = models.DecimalField(
-        verbose_name='SPM',
-        max_digits=10,
-        decimal_places=2,
-        help_text='Spend per mille (стоимость за 1000 показов)'
-    )
-    budget = models.DecimalField(
-        verbose_name='Budget',
-        max_digits=15,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.01'))]
-    )
+    spm = models.DecimalField(verbose_name='SPM', max_digits=10, decimal_places=2,
+                              help_text='Spend per mille (стоимость за 1000 показов)')
+    budget = models.DecimalField(verbose_name='Budget', max_digits=15, decimal_places=2,
+                                 validators=[MinValueValidator(Decimal('0.01'))])
 
     # Поля для управления показами
-    total_views = models.PositiveIntegerField(
-        verbose_name='Total Views',
-        default=0,
-        help_text='Общее количество купленных показов'
-    )
-    shown_views = models.PositiveIntegerField(
-        verbose_name='Shown Views',
-        default=0,
-        help_text='Количество уже показанных просмотров'
-    )
-    remaining_views = models.PositiveIntegerField(
-        verbose_name='Remaining Views',
-        default=0,
-        help_text='Оставшееся количество показов'
-    )
+    total_views = models.PositiveIntegerField(verbose_name='Total Views', default=0,
+                                              help_text='Общее количество купленных показов')
+    shown_views = models.PositiveIntegerField(verbose_name='Shown Views', default=0,
+                                              help_text='Количество уже показанных просмотров')
+    remaining_views = models.PositiveIntegerField(verbose_name='Remaining Views', default=0,
+                                                  help_text='Оставшееся количество показов')
     max_views_per_user = models.PositiveIntegerField(
         verbose_name='Максимальное количество показов одному пользователю',
         default=1,
@@ -151,21 +134,12 @@ class Order(models.Model):
     )
 
     # Статусы
-    completed = models.BooleanField(
-        verbose_name='Completed',
-        default=False,
-        help_text='True - реклама завершена (просмотры израсходованы)'
-    )
-    cancelled = models.BooleanField(
-        verbose_name='Cancelled',
-        default=False,
-        help_text='True - реклама отменена пользователем'
-    )
-    is_active = models.BooleanField(
-        verbose_name='Is Active',
-        default=True,
-        help_text='True - реклама активна и показывается'
-    )
+    completed = models.BooleanField(verbose_name='Completed', default=False,
+                                    help_text='True - реклама завершена (просмотры израсходованы)')
+    cancelled = models.BooleanField(verbose_name='Cancelled', default=False,
+                                    help_text='True - реклама отменена пользователем')
+    is_active = models.BooleanField(verbose_name='Is Active', default=True,
+                                    help_text='True - реклама активна и показывается')
 
     created_at = models.DateTimeField(verbose_name='Created At', auto_now_add=True)
     updated_at = models.DateTimeField(verbose_name='Updated At', auto_now=True)
@@ -261,26 +235,12 @@ class Order(models.Model):
 
 class AdView(models.Model):
     """Модель для отслеживания показов рекламы конкретным пользователям"""
-    order = models.ForeignKey(
-        Order,
-        on_delete=models.CASCADE,
-        related_name='ad_views',
-        verbose_name='Заказ'
-    )
-    viewer_id = models.CharField(
-        verbose_name='ID пользователя (зрителя)',
-        max_length=255,
-        help_text='ID пользователя, которому показывается реклама'
-    )
-    view_count = models.PositiveIntegerField(
-        verbose_name='Количество просмотров',
-        default=0,
-        help_text='Сколько раз этому пользователю уже показали эту рекламу'
-    )
-    last_viewed_at = models.DateTimeField(
-        verbose_name='Последний просмотр',
-        auto_now=True
-    )
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='ad_views', verbose_name='Заказ')
+    viewer_id = models.CharField(verbose_name='ID пользователя (зрителя)', max_length=255,
+                                 help_text='ID пользователя, которому показывается реклама')
+    view_count = models.PositiveIntegerField(verbose_name='Количество просмотров', default=0,
+                                             help_text='Сколько раз этому пользователю уже показали эту рекламу')
+    last_viewed_at = models.DateTimeField(verbose_name='Последний просмотр', auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -306,7 +266,7 @@ class AdView(models.Model):
         return True
 
 
-# user_budget
+    # user_budget
     # Реализовать функцию cancel. Может прийти запрос, чтобы завершить рекламу до закачивания количества просмотров.
     # И в этот момент
     # мы должны вернуть пользователю его деньги. В Первым Post запросе, нам будет приходит остаток денег пользователя

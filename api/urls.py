@@ -1,8 +1,8 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
+from rest_framework_simplejwt.views import TokenRefreshView
 from .views import UserProfileView, UserLoginView, UserRegistrationView, CreateChannelOrderView, SearchChannelsView, \
-    ChannelStatsView, OrderListView, ActiveOrderListView, ChannelOrderListView, BalanceView, DepositView, \
-    CancelOrderView, UserTokenVerifyView, OrderActivationView, OrderDetailView
+    OrderListView, ActiveOrderListView, BalanceView, DepositView, CancelOrderView, UserTokenVerifyView, \
+    OrderActivationView, OrderDetailView
 
 urlpatterns = [
     # Регистрация и аутентификация
@@ -24,18 +24,12 @@ urlpatterns = [
     # Отмена заказа
     path('orders/<int:order_id>/cancel/', CancelOrderView.as_view(), name='cancel_order'),
 
-    # Поиск каналов по тегу
-    path('search/', SearchChannelsView.as_view(), name='search-channels'),
-
-    # Статистика канала  ЭТОТ КОД НЕ НУЖЕН. НУЖНО УБРАТЬ ВСЕ ЧТО С НИМ СВЯЗАНО
-    path('stats/<str:channel_id>/', ChannelStatsView.as_view(), name='channel-stats'),
-
     # Списки заказов
     path('orders/<int:order_id>/', OrderDetailView.as_view(), name='order-detail'),
     path('orders/all/', OrderListView.as_view(), name='all-orders'),
     path('orders/active/', ActiveOrderListView.as_view(), name='active-orders'),
     path('orders/status/', OrderActivationView.as_view(), name='order_activation'),
 
-    # ЭТОТ КОД НЕ НУЖЕН. НУЖНО УБРАТЬ ВСЕ ЧТО С НИМ СВЯЗАНО
-    path('orders/channel/<str:channel_id>/', ChannelOrderListView.as_view(), name='channel-orders'),
+    # Поиск каналов по тегу
+    path('search/', SearchChannelsView.as_view(), name='search-channels'),
 ]

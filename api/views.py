@@ -16,7 +16,7 @@ from django.contrib.postgres.search import TrigramSimilarity
 from .models import Channel, Order, Tag, Balance, AdView
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, ChannelOrderSerializer,
-    UserProfileSerializer, OrderSerializer, ChannelStatsSerializer,
+    UserProfileSerializer, OrderSerializer,
     SearchResponseSerializer, OrderListSerializer, BalanceSerializer,
     CancelOrderSerializer, DepositSerializer, SearchResultSerializer, OrderActivationSerializer, OrderDetailSerializer
 )
@@ -169,48 +169,6 @@ class CancelOrderView(generics.GenericAPIView):
         if order.completed:
             return 'Нельзя отменить завершенный заказ.'
         return None
-
-
-class ChannelStatsView(generics.RetrieveAPIView):
-    """Получение статистики по каналу"""
-    serializer_class = ChannelStatsSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, channel_id):
-        try:
-            channel = Channel.objects.prefetch_related('tags').get(
-                channel_id=channel_id,
-                user=request.user
-            )
-
-            orders = Order.objects.filter(
-                channel_id=channel
-            ).prefetch_related('tags')
-
-            total_views = sum(order.total_views for order in orders)
-            active_orders = orders.filter(is_active=True, cancelled=False, remaining_views__gt=0).count()
-            total_spent = sum(float(order.budget) for order in orders)
-
-            channel_tags = [tag.name for tag in channel.tags.all()]
-
-            data = {
-                'channel_name': channel.channel_name,
-                'total_orders': orders.count(),
-                'active_orders': active_orders,
-                'total_views_purchased': total_views,
-                'total_budget_spent': total_spent,
-                'tags': channel_tags,
-                'orders': orders
-            }
-
-            serializer = self.get_serializer(data)
-            return Response(serializer.data)
-
-        except Channel.DoesNotExist:
-            return Response(
-                {'error': 'Канал не найден'},
-                status=status.HTTP_404_NOT_FOUND
-            )
 
 
 class StandardResultsSetPagination(PageNumberPagination):
@@ -367,30 +325,6 @@ class ActiveOrderListView(generics.ListAPIView):
             is_active=True,
             cancelled=False,
             remaining_views__gt=0
-        ).select_related('channel_id').prefetch_related('tags', 'channel_id__tags')
-
-
-class ChannelOrderListView(generics.ListAPIView):
-    """Получение заказов по конкретному каналу"""
-    serializer_class = OrderListSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    pagination_class = StandardResultsSetPagination
-
-    def get_queryset(self):
-        channel_id = self.kwargs['channel_id']
-
-        # Проверяем, что канал принадлежит пользователю
-        try:
-            channel = Channel.objects.get(
-                channel_id=channel_id,
-                user=self.request.user
-            )
-        except Channel.DoesNotExist:
-            return Order.objects.none()
-
-        # Возвращаем заказы этого канала
-        return Order.objects.filter(
-            channel_id=channel
         ).select_related('channel_id').prefetch_related('tags', 'channel_id__tags')
 
 

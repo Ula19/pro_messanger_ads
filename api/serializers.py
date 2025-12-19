@@ -393,17 +393,6 @@ class CancelOrderSerializer(serializers.Serializer):
         return data
 
 
-class ChannelStatsSerializer(serializers.Serializer):
-    """Сериализатор для статистики канала"""
-    channel_name = serializers.CharField()
-    total_orders = serializers.IntegerField()
-    active_orders = serializers.IntegerField()
-    total_views_purchased = serializers.IntegerField()
-    total_budget_spent = serializers.DecimalField(max_digits=15, decimal_places=2)
-    tags = serializers.ListField(child=serializers.CharField())
-    orders = OrderSerializer(many=True)
-
-
 class SearchResponseSerializer(serializers.Serializer):
     """Сериализатор для ответа поиска"""
     message = serializers.CharField()
