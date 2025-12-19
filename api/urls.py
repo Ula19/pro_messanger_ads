@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 from .views import UserProfileView, UserLoginView, UserRegistrationView, CreateChannelOrderView, SearchChannelsView, \
     ChannelStatsView, OrderListView, ActiveOrderListView, ChannelOrderListView, BalanceView, DepositView, \
-    CancelOrderView, UserTokenVerifyView, OrderActivationView
+    CancelOrderView, UserTokenVerifyView, OrderActivationView, OrderDetailView
 
 urlpatterns = [
     # Регистрация и аутентификация
@@ -31,6 +31,7 @@ urlpatterns = [
     path('stats/<str:channel_id>/', ChannelStatsView.as_view(), name='channel-stats'),
 
     # Списки заказов
+    path('orders/<int:order_id>/', OrderDetailView.as_view(), name='order-detail'),
     path('orders/all/', OrderListView.as_view(), name='all-orders'),
     path('orders/active/', ActiveOrderListView.as_view(), name='active-orders'),
     path('orders/status/', OrderActivationView.as_view(), name='order_activation'),

@@ -1,4 +1,6 @@
 import json
+
+from django.http import Http404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework import generics, permissions, status
 from rest_framework.pagination import PageNumberPagination
@@ -16,7 +18,7 @@ from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, ChannelOrderSerializer,
     UserProfileSerializer, OrderSerializer, ChannelStatsSerializer,
     SearchResponseSerializer, OrderListSerializer, BalanceSerializer,
-    CancelOrderSerializer, DepositSerializer, SearchResultSerializer, OrderActivationSerializer
+    CancelOrderSerializer, DepositSerializer, SearchResultSerializer, OrderActivationSerializer, OrderDetailSerializer
 )
 
 User = get_user_model()
@@ -229,6 +231,50 @@ class OrderListView(generics.ListAPIView):
         return Order.objects.filter(
             user=self.request.user
         ).select_related('channel_id').prefetch_related('tags', 'channel_id__tags')
+
+
+class OrderDetailView(generics.RetrieveAPIView):
+    """
+    Получение детальной информации о заказе.
+    GET /api/orders/{order_id}/
+    """
+    serializer_class = OrderDetailSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Возвращаем только заказы текущего пользователя
+        с оптимизацией запросов для тегов
+        """
+        return Order.objects.filter(
+            user=self.request.user
+        ).select_related('channel_id').prefetch_related('tags')
+
+    def get_object(self):
+        """
+        Получаем объект заказа с проверкой прав доступа
+        """
+        queryset = self.get_queryset()
+
+        try:
+            order_id = self.kwargs['order_id']
+            obj = queryset.get(id=order_id)
+            return obj
+        except Order.DoesNotExist:
+            # Возвращаем 404 с понятным сообщением
+            raise Http404("Заказ не найден или у вас нет прав на его просмотр")
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Переопределяем для кастомизации ответа при ошибке
+        """
+        try:
+            return super().retrieve(request, *args, **kwargs)
+        except Http404 as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 class OrderActivationView(generics.GenericAPIView):

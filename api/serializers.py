@@ -211,6 +211,31 @@ class OrderListSerializer(serializers.ModelSerializer):
         return obj.get_refund_amount()
 
 
+class OrderDetailSerializer(serializers.ModelSerializer):
+    """Сериализатор для детальной информации о заказе"""
+    tags = serializers.SerializerMethodField()
+    channel_id = serializers.IntegerField(source='channel_id.id')
+    refund_amount = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = [
+            'id', 'channel_id', 'channel_name', 'order_name', 'tags',
+            'spm', 'budget', 'total_views', 'shown_views', 'remaining_views',
+            'completed', 'cancelled', 'is_active', 'max_views_per_user',
+            'refund_amount', 'created_at', 'updated_at'
+        ]
+        read_only_fields = fields  # Все поля только для чтения
+
+    def get_tags(self, obj):
+        """Получаем список имен тегов заказа"""
+        return [tag.name for tag in obj.tags.all()]
+
+    def get_refund_amount(self, obj):
+        """Получаем сумму возврата при отмене"""
+        return obj.get_refund_amount()
+
+
 class OrderActivationSerializer(serializers.Serializer):
     """Сериализатор для активации/деактивации заказа"""
     order_id = serializers.IntegerField(required=True)
@@ -293,6 +318,7 @@ class ChannelOrderSerializer(serializers.Serializer):
     order_name = serializers.CharField(max_length=255, required=True)
     spm = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
     budget = serializers.DecimalField(max_digits=15, decimal_places=2, required=True)
+    max_views_per_user = serializers.IntegerField(default=1)
     is_active = serializers.BooleanField(default=True)
 
     def validate(self, data):
@@ -343,7 +369,8 @@ class ChannelOrderSerializer(serializers.Serializer):
             order_name=validated_data['order_name'],
             spm=validated_data['spm'],
             budget=validated_data['budget'],
-            is_active=validated_data['is_active']
+            is_active=validated_data['is_active'],
+            max_views_per_user=validated_data['max_views_per_user'],
         )
 
         # Сохраняем теги во временный атрибут
