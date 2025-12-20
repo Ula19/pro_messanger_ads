@@ -180,18 +180,18 @@ class OrderSerializer(serializers.ModelSerializer):
 class OrderListSerializer(serializers.ModelSerializer):
     """Сериализатор для списка заказов"""
     tags = serializers.SerializerMethodField()
-    channel_tags = serializers.SerializerMethodField()
+    # channel_tags = serializers.SerializerMethodField()
     refund_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = [
             'id', 'channel_id', 'channel_name', 'order_name',
-            'tags', 'channel_tags', 'spm', 'budget',
+            'tags', 'spm', 'budget',
             'total_views', 'shown_views', 'remaining_views',
             'completed', 'cancelled', 'is_active', 'refund_amount',
             'max_views_per_user',
-            'created_at'
+            'created_at', 'updated_at'
         ]
 
     def get_user_views_count(self, obj):
@@ -202,9 +202,9 @@ class OrderListSerializer(serializers.ModelSerializer):
         """Получаем только имена тегов заказа"""
         return [tag.name for tag in obj.tags.all()]
 
-    def get_channel_tags(self, obj):
-        """Получаем только имена тегов канала"""
-        return [tag.name for tag in obj.channel_id.tags.all()]
+    # def get_channel_tags(self, obj):
+    #     """Получаем только имена тегов канала"""
+    #     return [tag.name for tag in obj.channel_id.tags.all()]
 
     def get_refund_amount(self, obj):
         """Получаем сумму возврата при отмене"""
@@ -214,7 +214,7 @@ class OrderListSerializer(serializers.ModelSerializer):
 class OrderDetailSerializer(serializers.ModelSerializer):
     """Сериализатор для детальной информации о заказе"""
     tags = serializers.SerializerMethodField()
-    channel_id = serializers.IntegerField(source='channel_id.id')
+    # channel_id = serializers.IntegerField(source='channel_id.id')
     refund_amount = serializers.SerializerMethodField()
 
     class Meta:
@@ -222,8 +222,8 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'channel_id', 'channel_name', 'order_name', 'tags',
             'spm', 'budget', 'total_views', 'shown_views', 'remaining_views',
-            'completed', 'cancelled', 'is_active', 'max_views_per_user',
-            'refund_amount', 'created_at', 'updated_at'
+            'completed', 'cancelled', 'is_active', 'refund_amount',
+            'max_views_per_user', 'created_at', 'updated_at'
         ]
         read_only_fields = fields  # Все поля только для чтения
 

@@ -180,7 +180,9 @@ class StandardResultsSetPagination(PageNumberPagination):
 
 class OrderListView(generics.ListAPIView):
     """Получение всех заказов текущего пользователя"""
-    serializer_class = OrderListSerializer
+    # serializer_class = OrderListSerializer  # Пусть пока постоит. Сейчас OrderListSerializer делает тоже самое
+    # что и OrderDetailSerializer
+    serializer_class = OrderDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardResultsSetPagination
 
@@ -298,14 +300,12 @@ class OrderActivationView(generics.GenericAPIView):
             'message': f'Статус заказа успешно изменен с {old_status} на {is_active}',
             'order': {
                 'id': order.id,
+                'channel_name': order.channel_name,
                 'order_name': order.order_name,
                 'is_active': order.is_active,
-                'old_status': old_status,
-                'new_status': is_active,
                 'remaining_views': order.remaining_views,
                 'completed': order.completed,
                 'cancelled': order.cancelled,
-                'channel_name': order.channel_name
             }
         }
 
@@ -314,7 +314,9 @@ class OrderActivationView(generics.GenericAPIView):
 
 class ActiveOrderListView(generics.ListAPIView):
     """Получение активных заказов текущего пользователя"""
-    serializer_class = OrderListSerializer
+    # serializer_class = OrderListSerializer # Пусть пока постоит. Сейчас OrderListSerializer делает тоже самое
+    # что и OrderDetailSerializer
+    serializer_class = OrderDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardResultsSetPagination
 
