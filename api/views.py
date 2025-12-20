@@ -17,8 +17,9 @@ from .models import Channel, Order, Tag, Balance, AdView
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, ChannelOrderSerializer,
     UserProfileSerializer, OrderSerializer,
-    SearchResponseSerializer, OrderListSerializer, BalanceSerializer,
-    CancelOrderSerializer, DepositSerializer, SearchResultSerializer, OrderActivationSerializer, OrderDetailSerializer
+    OrderListSerializer, BalanceSerializer, CancelOrderSerializer,
+    DepositSerializer, SearchResultSerializer, OrderActivationSerializer,
+    OrderDetailSerializer, SearchRequestSerializer
 )
 
 User = get_user_model()
@@ -332,24 +333,30 @@ class ActiveOrderListView(generics.ListAPIView):
 
 class SearchChannelsView(generics.GenericAPIView):
     """Поиск каналов по тегу с учетом лимита показов на пользователя"""
-    serializer_class = SearchResultSerializer
+    # Указываем сериализатор для документации Swagger (если используется)
+    serializer_class = SearchRequestSerializer
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        tag = request.data.get('tag', '').strip().lower()
-        viewer_id = request.data.get('viewer_id', '').strip()
-
-        if not tag or not viewer_id:
+        # 1. Валидация входных данных с помощью SearchRequestSerializer
+        request_serializer = SearchRequestSerializer(data=request.data)
+        if not request_serializer.is_valid():
             return Response(
-                {'error': 'Не указаны обязательные параметры: tag и viewer_id'},
+                {'error': 'Неверные входные данные', 'details': request_serializer.errors},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Пробуем найти подходящий заказ для показа
+        tag = request_serializer.validated_data['tag'].strip().lower()
+        viewer_id = request_serializer.validated_data['viewer_id'].strip()
+
+        # 2. Пробуем найти подходящий заказ для показа
         result = self._find_suitable_order(tag, viewer_id)
 
         if result:
-            return Response(result, status=status.HTTP_200_OK)
+            # 3. Сериализуем результат с помощью SearchResultSerializer
+            result_serializer = SearchResultSerializer(data=result)
+            result_serializer.is_valid(raise_exception=True)  # Гарантируем корректность данных
+            return Response(result_serializer.data, status=status.HTTP_200_OK)
         else:
             return Response(
                 {'error': 'Нет доступной рекламы по данному тегу для вашего пользователя'},
@@ -393,14 +400,12 @@ class SearchChannelsView(generics.GenericAPIView):
             success = self._try_show_ad_to_user(order, viewer_id)
 
             if success:
-                # Получаем обновленные данные о просмотрах пользователя
-                ad_view = AdView.objects.get(order=order, viewer_id=viewer_id)
-
+                # Подготавливаем данные для SearchResultSerializer
+                # Приводим order.id к строке, так как в сериализаторе это CharField
                 return {
                     'channel_id': order.channel_id.channel_id,
                     'channel_name': order.channel_id.channel_name,
                     'order_id': order.id,
-                    'spm': order.spm
                 }
 
         return None

@@ -212,9 +212,29 @@ class OrderListSerializer(serializers.ModelSerializer):
 
 
 class OrderDetailSerializer(serializers.ModelSerializer):
-    """Сериализатор для детальной информации о заказе"""
+    """
+    Сериализатор для детальной информации о заказе
+
+    Поля:
+    - id: Уникальный идентификатор заказа в системе
+    - channel_id: ID связанного канала (ForeignKey -> Channel.id)
+    - channel_name: Название канала, в котором размещается реклама
+    - order_name: Название рекламного заказа (кампании)
+    - tags: Список тегов, связанных с заказом (ManyToMany -> Tag)
+    - spm: Spend per mille - стоимость 1000 показов в денежных единицах
+    - budget: Общий бюджет заказа, выделенный на рекламу
+    - total_views: Общее количество купленных показов
+    - shown_views: Количество уже показанных пользователям просмотров
+    - remaining_views: Оставшееся количество показов к отображению
+    - completed: Флаг завершения заказа (True = все показы израсходованы)
+    - cancelled: Флаг отмены заказа (True = заказ отменен пользователем)
+    - is_active: Флаг активности заказа (True = реклама показывается)
+    - refund_amount: Сумма, которая будет возвращена при отмене заказа
+    - max_views_per_user: Максимальное количество показов одному пользователю
+    - created_at: Дата и время создания заказа
+    - updated_at: Дата и время последнего обновления заказа
+    """
     tags = serializers.SerializerMethodField()
-    # channel_id = serializers.IntegerField(source='channel_id.id')
     refund_amount = serializers.SerializerMethodField()
 
     class Meta:
@@ -225,14 +245,17 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             'completed', 'cancelled', 'is_active', 'refund_amount',
             'max_views_per_user', 'created_at', 'updated_at'
         ]
-        read_only_fields = fields  # Все поля только для чтения
+        read_only_fields = fields
 
     def get_tags(self, obj):
-        """Получаем список имен тегов заказа"""
+        """Преобразует связанные объекты Tag в СПИСОК строковых имен"""
         return [tag.name for tag in obj.tags.all()]
 
     def get_refund_amount(self, obj):
-        """Получаем сумму возврата при отмене"""
+        """
+        Вычисляет сумму возврата при отмене на основе оставшихся просмотров и SPM.
+        Использует метод модели get_refund_amount().
+        """
         return obj.get_refund_amount()
 
 
@@ -306,7 +329,7 @@ class OrderActivationSerializer(serializers.Serializer):
 
         return errors
 
-
+# НУЖНО ПЕРЕДЕЛАТЬ ОТВЕТЬ КОТОРЫЙ БУДЕТ ВОЗВРАЩЕНЬ В СЛУЧАЕ УСПЕХА
 class ChannelOrderSerializer(serializers.Serializer):
     """Сериализатор для создания канала и заказа"""
     # Поля канала
@@ -393,13 +416,6 @@ class CancelOrderSerializer(serializers.Serializer):
         return data
 
 
-class SearchResponseSerializer(serializers.Serializer):
-    """Сериализатор для ответа поиска"""
-    message = serializers.CharField()
-    channel = serializers.DictField()
-    remaining_views = serializers.IntegerField()
-
-
 class DepositSerializer(serializers.Serializer):
     """Сериализатор для пополнения баланса"""
     amount = serializers.DecimalField(
@@ -415,6 +431,14 @@ class DepositSerializer(serializers.Serializer):
         return data
 
 
+# class SearchResponseSerializer(serializers.Serializer):
+#     """Сериализатор для ответа поиска"""
+#     message = serializers.CharField()
+#     channel = serializers.DictField()
+#     remaining_views = serializers.IntegerField()
+
+
+# НУЖНО В ПРЕДСТАВЛЕНИЕ ЭТО ИСПОЛЬЗОВАТЬ. СЕЙЧАС ОН НЕ ИСПОЛЬЗУЕТСЯ
 class SearchResultSerializer(serializers.Serializer):
     """Сериализатор для результата поиска"""
     channel_id = serializers.CharField()

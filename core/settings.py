@@ -216,3 +216,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
   "username": "admin",
   "is_admin": 'true'
 }
+
+{
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2NjgxMDkyMywiaWF0IjoxNzY2MjA2MTIzLCJqdGkiOiIxMzFmZDA2NTFlZDY0NjNjODcxMzdiZmVmNmMzNmI0NCIsInVzZXJfaWQiOiI0In0.LoAkphYwGniQZXv-D6pZYO_ONxxfezDJ527q9EwWqKQ",
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY2MjkyNTIzLCJpYXQiOjE3NjYyMDYxMjMsImp0aSI6Ijg5NDQyMGRjMWNkMDQ5MWFhZWIzMmFjYmFmNzE3OGJhIiwidXNlcl9pZCI6IjQifQ.eVXiRMiHeOdybrpOhzgz_dcJ7_7p99Pq4xsjpkZe8Us",
+  "user_id": "1133d289-42d9-4caf-8252-ba2d9657eb0e",
+  "username": "harry",
+  "is_admin": 'false'
+}
