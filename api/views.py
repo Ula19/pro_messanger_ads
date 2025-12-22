@@ -377,7 +377,6 @@ class ActiveOrderListView(generics.ListAPIView):
 
 class SearchChannelsView(generics.GenericAPIView):
     """Поиск каналов по тегу с учетом лимита показов на пользователя"""
-    # Указываем сериализатор для документации Swagger (если используется)
     serializer_class = SearchRequestSerializer
     permission_classes = [permissions.AllowAny]
 
@@ -399,7 +398,7 @@ class SearchChannelsView(generics.GenericAPIView):
         if result:
             # 3. Сериализуем результат с помощью SearchResultSerializer
             result_serializer = SearchResultSerializer(data=result)
-            result_serializer.is_valid(raise_exception=True)  # Гарантируем корректность данных
+            result_serializer.is_valid(raise_exception=True)
             return Response(result_serializer.data, status=status.HTTP_200_OK)
         else:
             return Response(
@@ -408,25 +407,15 @@ class SearchChannelsView(generics.GenericAPIView):
             )
 
     def _find_suitable_order(self, tag_name, viewer_id):
-        """Поиск подходящего заказа для показа"""
-        # Сначала ищем точное совпадение тега
+        """Поиск подходящего заказа для показа по точному совпадению тега"""
         try:
+            # Ищем точное совпадение тега
             tag_obj = Tag.objects.get(name=tag_name)
             orders = self._get_sorted_orders_by_tag(tag_obj)
-            return self._process_orders(orders, viewer_id, "exact")
+            return self._process_orders(orders, viewer_id)
         except Tag.DoesNotExist:
-            pass
-
-        # Если точного тега нет, ищем похожие теги
-        similar_tags = Tag.find_similar_tags(tag_name, threshold=0.3)
-
-        for similar_tag in similar_tags:
-            orders = self._get_sorted_orders_by_tag(similar_tag)
-            result = self._process_orders(orders, viewer_id, "similar")
-            if result:
-                return result
-
-        return None
+            # Если тег не найден - сразу возвращаем None
+            return None
 
     def _get_sorted_orders_by_tag(self, tag_obj):
         """Получает активные заказы с тегом, отсортированные по SPM"""
@@ -437,7 +426,7 @@ class SearchChannelsView(generics.GenericAPIView):
             remaining_views__gt=0
         ).select_related('channel_id').order_by('-spm')
 
-    def _process_orders(self, orders, viewer_id, search_type):
+    def _process_orders(self, orders, viewer_id):
         """Обрабатывает список заказов, находит подходящий для показа"""
         for order in orders:
             # Пытаемся показать рекламу
@@ -445,7 +434,6 @@ class SearchChannelsView(generics.GenericAPIView):
 
             if success:
                 # Подготавливаем данные для SearchResultSerializer
-                # Приводим order.id к строке, так как в сериализаторе это CharField
                 return {
                     'channel_id': order.channel_id.channel_id,
                     'channel_name': order.channel_id.channel_name,
