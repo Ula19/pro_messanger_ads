@@ -29,7 +29,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG')
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -199,28 +199,3 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-
-{
-  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2Njc0OTk0MiwiaWF0IjoxNzY2MTQ1MTQyLCJqdGkiOiI5OGYzMmNmNTBjNzk0N2MzYjQxZjExZjI0YWQ3MmRmMiIsInVzZXJfaWQiOiIzIn0.92zqRHyOMdyCKyc37H3A94_Epi35bV4q4WQGXn-qX4A",
-  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY2MjMxNTQyLCJpYXQiOjE3NjYxNDUxNDIsImp0aSI6IjhmNDE2ZTVmOTM2YTRmNzNiZjIwYzM3MWQyYjY0NjhhIiwidXNlcl9pZCI6IjMifQ.8e12YKKop62MvWDTs0_F6Sm_rGUIAKiZ7UgkWA8jO20",
-  "user_id": "f67c58da-8112-41d7-b05c-0d25f6b2d70f",
-  "username": "ulugbek",
-  "is_admin": 'false'
-}
-
-{
-  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2NjU3NDIwMCwiaWF0IjoxNzY1OTY5NDAwLCJqdGkiOiI2MTIyYzNlZDJiOTg0NTU3OWNkZWZjNDExNjYxNTI3MyIsInVzZXJfaWQiOiIxIn0.zKSEYd30EV6a6n-e_E60ud9jxEd17a_51JzvXt8EAZw",
-  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY2MDU1ODAwLCJpYXQiOjE3NjU5Njk0MDAsImp0aSI6ImVmM2RjMjFmMTBhZjQ0ZjRiZmZlMTJmOTRlMmVkOTYxIiwidXNlcl9pZCI6IjEifQ.kJ4Pobyey8hmpFr5LdhvPrUT8qLVm7DPE7klRSj6ptE",
-  "user_id": "439e22b3-1a47-461f-a0fb-42ca9c0eaa55",
-  "username": "admin",
-  "is_admin": 'true'
-}
-
-{
-  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2NjgxMDkyMywiaWF0IjoxNzY2MjA2MTIzLCJqdGkiOiIxMzFmZDA2NTFlZDY0NjNjODcxMzdiZmVmNmMzNmI0NCIsInVzZXJfaWQiOiI0In0.LoAkphYwGniQZXv-D6pZYO_ONxxfezDJ527q9EwWqKQ",
-  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY2MjkyNTIzLCJpYXQiOjE3NjYyMDYxMjMsImp0aSI6Ijg5NDQyMGRjMWNkMDQ5MWFhZWIzMmFjYmFmNzE3OGJhIiwidXNlcl9pZCI6IjQifQ.eVXiRMiHeOdybrpOhzgz_dcJ7_7p99Pq4xsjpkZe8Us",
-  "user_id": "1133d289-42d9-4caf-8252-ba2d9657eb0e",
-  "username": "harry",
-  "is_admin": 'false'
-}
