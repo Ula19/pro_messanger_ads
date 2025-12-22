@@ -1,8 +1,8 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
+from rest_framework_simplejwt.views import TokenRefreshView
 from .views import UserProfileView, UserLoginView, UserRegistrationView, CreateChannelOrderView, SearchChannelsView, \
-    ChannelStatsView, OrderListView, ActiveOrderListView, ChannelOrderListView, BalanceView, DepositView, \
-    CancelOrderView, UserTokenVerifyView
+    OrderListView, ActiveOrderListView, BalanceView, DepositView, CancelOrderView, UserTokenVerifyView, \
+    OrderActivationView, OrderDetailView, AdminDepositView
 
 urlpatterns = [
     # Регистрация и аутентификация
@@ -16,22 +16,20 @@ urlpatterns = [
 
     # Управление балансом
     path('balance/', BalanceView.as_view(), name='balance'),
-    path('balance/deposit/', DepositView.as_view(), name='deposit'),
-
+    # path('balance/deposit/', DepositView.as_view(), name='deposit'),
+    # path('admin/balance/deposit/', AdminDepositView.as_view(), name='admin_deposit'),
     # Создание канала и заказа
     path('channel_id-order/create/', CreateChannelOrderView.as_view(), name='create_channel_order'),
 
     # Отмена заказа
     path('orders/<int:order_id>/cancel/', CancelOrderView.as_view(), name='cancel_order'),
 
-    # Поиск и показ рекламы
-    path('search/', SearchChannelsView.as_view(), name='search-channels'),
-
-    # Статистика канала
-    path('stats/<str:channel_id>/', ChannelStatsView.as_view(), name='channel-stats'),
-
     # Списки заказов
+    path('orders/<int:order_id>/', OrderDetailView.as_view(), name='order-detail'),
     path('orders/all/', OrderListView.as_view(), name='all-orders'),
     path('orders/active/', ActiveOrderListView.as_view(), name='active-orders'),
-    path('orders/channel/<str:channel_id>/', ChannelOrderListView.as_view(), name='channel-orders'),
+    path('orders/status/', OrderActivationView.as_view(), name='order_activation'),
+
+    # Поиск каналов по тегу
+    path('search/', SearchChannelsView.as_view(), name='search-channels'),
 ]

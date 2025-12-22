@@ -1,21 +1,25 @@
 import json
-from django.db.models import Q, Max
+
+from django.http import Http404
 from rest_framework.decorators import api_view, permission_classes
-from django.db import transaction
 from rest_framework import generics, permissions, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
+from django.db import transaction
+from django.db.models import Q, Max, Subquery, OuterRef
 from django.contrib.auth import get_user_model
+from django.contrib.postgres.search import TrigramSimilarity
 
-from .models import Channel, Order, Tag, Balance
+from .models import Channel, Order, Tag, Balance, AdView
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, ChannelOrderSerializer,
-    UserProfileSerializer, OrderSerializer, ChannelStatsSerializer,
-    SearchResponseSerializer, OrderListSerializer, BalanceSerializer,
-    CancelOrderSerializer, DepositSerializer
+    UserProfileSerializer, OrderSerializer,
+    OrderListSerializer, BalanceSerializer, CancelOrderSerializer,
+    DepositSerializer, SearchResultSerializer, OrderActivationSerializer,
+    OrderDetailSerializer, SearchRequestSerializer, AdminDepositSerializer
 )
 
 User = get_user_model()
@@ -88,6 +92,52 @@ class DepositView(generics.GenericAPIView):
         }, status=status.HTTP_200_OK)
 
 
+class AdminDepositView(generics.GenericAPIView):
+    """
+    Пополнение баланса пользователя администратором.
+    Только пользователи с is_admin=True могут использовать этот эндпоинт.
+    """
+    serializer_class = AdminDepositSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """
+        Пополняет баланс указанного пользователя
+        """
+        # Проверяем, является ли текущий пользователь администратором
+        if not request.user.is_admin:
+            return Response(
+                {'error': 'У вас нет прав для выполнения этой операции'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data['user']
+        amount = serializer.validated_data['amount']
+
+        # Получаем или создаем баланс пользователя
+        balance, created = Balance.objects.get_or_create(user=user)
+
+        # Пополняем баланс
+        balance.deposit(amount)
+
+        return Response({
+            'message': f'Баланс пользователя {user.username} успешно пополнен на {amount}',
+            'user_info': {
+                'user_id': str(user.user_id),
+                'username': user.username,
+                'email': user.email
+            },
+            'balance_info': {
+                'old_balance': balance.amount - amount,
+                'new_balance': balance.amount,
+                'added_amount': amount
+            }
+        }, status=status.HTTP_200_OK)
+
+
 class CreateChannelOrderView(generics.CreateAPIView):
     """Создание канала и заказа в одном запросе"""
     serializer_class = ChannelOrderSerializer
@@ -103,111 +153,47 @@ class CreateChannelOrderView(generics.CreateAPIView):
 
         return Response({
             'message': 'Канал и заказ успешно созданы',
-            'channel': result['channel'],
-            'order': result['order']
         }, status=status.HTTP_201_CREATED)
 
 
-class SearchChannelsView(generics.GenericAPIView):
-    """Поиск каналов по тегу и показ рекламы"""
-    permission_classes = [permissions.AllowAny]
-    serializer_class = SearchResponseSerializer
-
-    def get(self, request):
-        tag = request.query_params.get('tag', '').strip().lower()
-
-        if not tag:
-            return Response(
-                {'error': 'Параметр tag обязателен'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            # Получаем тег из базы
-            tag_obj = Tag.objects.get(name=tag)
-
-            # Находим активные заказы с указанным тегом (не отмененные)
-            active_orders = Order.objects.filter(
-                is_active=True,
-                cancelled=False,
-                remaining_views__gt=0,
-                tags=tag_obj
-            ).select_related('channel_id').prefetch_related('tags')
-
-            if not active_orders.exists():
-                return Response(
-                    {'message': 'Нет активной рекламы для данного тега'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-
-            # Находим заказ с максимальным SPM
-            best_order = active_orders.order_by('-spm').first()
-
-            # Атомарно уменьшаем счетчик показов
-            with transaction.atomic():
-                order = Order.objects.select_for_update().get(pk=best_order.pk)
-
-                if order.remaining_views > 0 and not order.cancelled:
-                    order.decrement_views()
-
-                    # Подготавливаем данные для ответа
-                    channel_data = {
-                        'channel_id': order.channel_id.channel_id,
-                        'channel_name': order.channel_id.channel_name,
-                        'tags': [tag.name for tag in order.channel_id.tags.all()],
-                        'order_name': order.order_name,
-                        'spm': float(order.spm),
-                        'remaining_views': order.remaining_views,
-                        'shown_views': order.shown_views,
-                        'is_active': order.is_active,
-                        'cancelled': order.cancelled
-                    }
-
-                    # Создаем данные для сериализатора
-                    response_data = {
-                        'message': 'Реклама показана успешно',
-                        'channel': channel_data,
-                        'remaining_views': order.remaining_views
-                    }
-
-                    serializer = self.get_serializer(response_data)
-                    return Response(serializer.data)
-                else:
-                    order.is_active = False
-                    order.save()
-                    return Response(
-                        {'message': 'Лимит показов исчерпан или реклама отменена'},
-                        status=status.HTTP_410_GONE
-                    )
-
-        except Tag.DoesNotExist:
-            return Response(
-                {'message': 'Тег не найден'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-
 class CancelOrderView(generics.GenericAPIView):
-    """Отмена заказа и возврат средств"""
-    serializer_class = CancelOrderSerializer
+    """Отмена заказа по ID в URL"""
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, order_id):
+        """
+        Отменяет заказ пользователя.
+        Получает order_id из параметра пути URL.
+        """
         try:
-            # Получаем заказ пользователя
-            order = Order.objects.get(id=order_id, user=request.user)
+            # Все операции с базой данных, включая выборку с блокировкой и обновление,
+            # должны быть внутри ОДНОЙ транзакции.
+            with transaction.atomic():
+                # 1. Находим заказ и проверяем права доступа
+                # select_for_update() блокирует строку заказа для других транзакций,
+                # что гарантирует целостность при конкурентном доступе.
+                order = Order.objects.select_for_update().get(id=order_id, user=request.user)
 
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
+                # 2. Валидация состояния заказа перед отменой
+                validation_error = self._validate_order_for_cancellation(order)
+                if validation_error:
+                    # Если валидация не прошла, транзакция откатится сама
+                    return Response(
+                        {'error': validation_error},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
-            # Отменяем заказ и получаем сумму возврата
-            refund_amount = order.cancel_order()
+                # 3. Выполняем отмену. Метод cancel_order() вызывает order.save()
+                refund_amount = order.cancel_order()
 
+            # 4. Возвращаем успешный ответ ВНЕ транзакции
             return Response({
-                'message': 'Заказ успешно отменен',
+                'message': 'Заказ успешно отменен.',
                 'refund_amount': refund_amount,
                 'new_balance': request.user.balance.amount,
                 'order_status': {
+                    'id': order.id,
+                    'order_name': order.order_name,
                     'cancelled': order.cancelled,
                     'is_active': order.is_active,
                     'remaining_views': order.remaining_views
@@ -215,64 +201,33 @@ class CancelOrderView(generics.GenericAPIView):
             }, status=status.HTTP_200_OK)
 
         except Order.DoesNotExist:
+            # Этот блок находится вне транзакции, так как исключение выбрасывается при запросе
             return Response(
-                {'error': 'Заказ не найден или у вас нет прав на его отмену'},
+                {'error': 'Заказ не найден или у вас нет прав на его отмену.'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-
-class ChannelStatsView(generics.RetrieveAPIView):
-    """Получение статистики по каналу"""
-    serializer_class = ChannelStatsSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, channel_id):
-        try:
-            channel = Channel.objects.prefetch_related('tags').get(
-                channel_id=channel_id,
-                user=request.user
-            )
-
-            orders = Order.objects.filter(
-                channel_id=channel
-            ).prefetch_related('tags')
-
-            total_views = sum(order.total_views for order in orders)
-            active_orders = orders.filter(is_active=True, cancelled=False, remaining_views__gt=0).count()
-            total_spent = sum(float(order.budget) for order in orders)
-
-            channel_tags = [tag.name for tag in channel.tags.all()]
-
-            data = {
-                'channel_name': channel.channel_name,
-                'total_orders': orders.count(),
-                'active_orders': active_orders,
-                'total_views_purchased': total_views,
-                'total_budget_spent': total_spent,
-                'tags': channel_tags,
-                'orders': orders
-            }
-
-            serializer = self.get_serializer(data)
-            return Response(serializer.data)
-
-        except Channel.DoesNotExist:
-            return Response(
-                {'error': 'Канал не найден'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+    def _validate_order_for_cancellation(self, order):
+        """Проверяет, можно ли отменить заказ."""
+        if order.cancelled:
+            return 'Заказ уже отменен.'
+        if order.completed:
+            return 'Нельзя отменить завершенный заказ.'
+        return None
 
 
 class StandardResultsSetPagination(PageNumberPagination):
     """Пагинация для списков"""
-    page_size = 20
+    page_size = 5
     page_size_query_param = 'page_size'
     max_page_size = 100
 
 
 class OrderListView(generics.ListAPIView):
     """Получение всех заказов текущего пользователя"""
-    serializer_class = OrderListSerializer
+    # serializer_class = OrderListSerializer  # Пусть пока постоит. Сейчас OrderListSerializer делает тоже самое
+    # что и OrderDetailSerializer
+    serializer_class = OrderDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardResultsSetPagination
 
@@ -283,9 +238,130 @@ class OrderListView(generics.ListAPIView):
         ).select_related('channel_id').prefetch_related('tags', 'channel_id__tags')
 
 
+class OrderDetailView(generics.RetrieveAPIView):
+    """
+    Получение детальной информации о заказе.
+    GET /api/orders/{order_id}/
+    """
+    serializer_class = OrderDetailSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Возвращаем только заказы текущего пользователя
+        с оптимизацией запросов для тегов
+        """
+        return Order.objects.filter(
+            user=self.request.user
+        ).select_related('channel_id').prefetch_related('tags')
+
+    def get_object(self):
+        """
+        Получаем объект заказа с проверкой прав доступа
+        """
+        queryset = self.get_queryset()
+
+        try:
+            order_id = self.kwargs['order_id']
+            obj = queryset.get(id=order_id)
+            return obj
+        except Order.DoesNotExist:
+            # Возвращаем 404 с понятным сообщением
+            raise Http404("Заказ не найден или у вас нет прав на его просмотр")
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Переопределяем для кастомизации ответа при ошибке
+        """
+        try:
+            return super().retrieve(request, *args, **kwargs)
+        except Http404 as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+class OrderActivationView(generics.GenericAPIView):
+    """
+    Активация/деактивация заказа по ID
+    Получает order_id и is_active в теле POST запроса
+    """
+    serializer_class = OrderActivationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """
+        Обработка POST запроса для активации/деактивации заказа
+        """
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        # Получаем данные из сериализатора
+        order = serializer.validated_data['order']
+        is_active = serializer.validated_data['is_active']
+
+        # Если есть warning (например, статус уже такой же), возвращаем его
+        if 'warning' in serializer.validated_data:
+            return Response({
+                'message': serializer.validated_data['warning'],
+                'order_id': order.id,
+                'current_status': order.is_active,
+                'requested_status': is_active
+            }, status=status.HTTP_200_OK)
+
+        # Используем атомарную транзакцию для безопасности
+        with transaction.atomic():
+            # Блокируем заказ для предотвращения race conditions
+            locked_order = Order.objects.select_for_update().get(id=order.id)
+
+            # Сохраняем старый статус
+            old_status = locked_order.is_active
+
+            # Обновляем статус
+            locked_order.is_active = is_active
+
+            # Дополнительная логика при активации
+            if is_active:
+                # Проверяем, не израсходованы ли все просмотры
+                if locked_order.remaining_views <= 0:
+                    return Response({
+                        'error': 'Невозможно активировать заказ: все просмотры израсходованы'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                # Если заказ был деактивирован, но не завершен и не отменен
+                # Убедимся, что completed установлен правильно
+                if locked_order.remaining_views == 0 and not locked_order.completed:
+                    locked_order.completed = True
+                    locked_order.is_active = False
+
+            # При деактивации просто меняем статус
+            # Заказ уже проверен на отмену и завершение в сериализаторе
+
+            locked_order.save()
+
+        # Формируем ответ
+        response_data = {
+            'message': f'Статус заказа успешно изменен с {old_status} на {is_active}',
+            'order': {
+                'id': order.id,
+                'channel_name': order.channel_name,
+                'order_name': order.order_name,
+                'is_active': order.is_active,
+                'remaining_views': order.remaining_views,
+                'completed': order.completed,
+                'cancelled': order.cancelled,
+            }
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
 class ActiveOrderListView(generics.ListAPIView):
     """Получение активных заказов текущего пользователя"""
-    serializer_class = OrderListSerializer
+    # serializer_class = OrderListSerializer # Пусть пока постоит. Сейчас OrderListSerializer делает тоже самое
+    # что и OrderDetailSerializer
+    serializer_class = OrderDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardResultsSetPagination
 
@@ -299,25 +375,113 @@ class ActiveOrderListView(generics.ListAPIView):
         ).select_related('channel_id').prefetch_related('tags', 'channel_id__tags')
 
 
-class ChannelOrderListView(generics.ListAPIView):
-    """Получение заказов по конкретному каналу"""
-    serializer_class = OrderListSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    pagination_class = StandardResultsSetPagination
+class SearchChannelsView(generics.GenericAPIView):
+    """Поиск каналов по тегу с учетом лимита показов на пользователя"""
+    serializer_class = SearchRequestSerializer
+    permission_classes = [permissions.AllowAny]
 
-    def get_queryset(self):
-        channel_id = self.kwargs['channel_id']
-
-        # Проверяем, что канал принадлежит пользователю
-        try:
-            channel = Channel.objects.get(
-                channel_id=channel_id,
-                user=self.request.user
+    def post(self, request):
+        # 1. Валидация входных данных с помощью SearchRequestSerializer
+        request_serializer = SearchRequestSerializer(data=request.data)
+        if not request_serializer.is_valid():
+            return Response(
+                {'error': 'Неверные входные данные', 'details': request_serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
             )
-        except Channel.DoesNotExist:
-            return Order.objects.none()
 
-        # Возвращаем заказы этого канала
+        tag = request_serializer.validated_data['tag'].strip().lower()
+        viewer_id = request_serializer.validated_data['viewer_id'].strip()
+
+        # 2. Пробуем найти подходящий заказ для показа
+        result = self._find_suitable_order(tag, viewer_id)
+
+        if result:
+            # 3. Сериализуем результат с помощью SearchResultSerializer
+            result_serializer = SearchResultSerializer(data=result)
+            result_serializer.is_valid(raise_exception=True)
+            return Response(result_serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(
+                {'error': 'Нет доступной рекламы по данному тегу для вашего пользователя'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    def _find_suitable_order(self, tag_name, viewer_id):
+        """Поиск подходящего заказа для показа по точному совпадению тега"""
+        try:
+            # Ищем точное совпадение тега
+            tag_obj = Tag.objects.get(name=tag_name)
+            orders = self._get_sorted_orders_by_tag(tag_obj)
+            return self._process_orders(orders, viewer_id)
+        except Tag.DoesNotExist:
+            # Если тег не найден - сразу возвращаем None
+            return None
+
+    def _get_sorted_orders_by_tag(self, tag_obj):
+        """Получает активные заказы с тегом, отсортированные по SPM"""
         return Order.objects.filter(
-            channel_id=channel
-        ).select_related('channel_id').prefetch_related('tags', 'channel_id__tags')
+            tags=tag_obj,
+            is_active=True,
+            cancelled=False,
+            remaining_views__gt=0
+        ).select_related('channel_id').order_by('-spm')
+
+    def _process_orders(self, orders, viewer_id):
+        """Обрабатывает список заказов, находит подходящий для показа"""
+        for order in orders:
+            # Пытаемся показать рекламу
+            success = self._try_show_ad_to_user(order, viewer_id)
+
+            if success:
+                # Подготавливаем данные для SearchResultSerializer
+                return {
+                    'channel_id': order.channel_id.channel_id,
+                    'channel_name': order.channel_id.channel_name,
+                    'order_id': order.id,
+                }
+
+        return None
+
+    def _try_show_ad_to_user(self, order, viewer_id):
+        """Пытается показать рекламу пользователю"""
+        try:
+            with transaction.atomic():
+                # Блокируем заказ для безопасного обновления
+                order_lock = Order.objects.select_for_update().get(pk=order.pk)
+
+                # Проверяем, можно ли показывать заказ
+                if (order_lock.remaining_views <= 0 or
+                        order_lock.cancelled or
+                        not order_lock.is_active):
+                    return False
+
+                # Получаем или создаем запись о просмотрах пользователя
+                ad_view, created = AdView.objects.get_or_create(
+                    order=order_lock,
+                    viewer_id=viewer_id,
+                    defaults={'view_count': 0}
+                )
+
+                # Проверяем лимит показов для пользователя
+                if ad_view.view_count >= order_lock.max_views_per_user:
+                    return False  # Лимит исчерпан
+
+                # Обновляем счетчики заказа
+                order_lock.shown_views += 1
+                order_lock.remaining_views -= 1
+
+                if order_lock.remaining_views == 0:
+                    order_lock.completed = True
+                    order_lock.is_active = False
+
+                order_lock.save()
+
+                # Обновляем счетчик просмотров пользователя
+                ad_view.view_count += 1
+                ad_view.save()
+
+                return True
+
+        except Exception as e:
+            print(f"Ошибка при показе рекламы: {e}")
+            return False

@@ -75,6 +75,14 @@ class Tag(models.Model):
     def __str__(self):
         return self.name
 
+    @classmethod
+    def find_similar_tags(cls, tag_name, threshold=0.3):
+        """Поиск похожих тегов по триграммному сходству"""
+        from django.contrib.postgres.search import TrigramSimilarity
+        return cls.objects.annotate(
+            similarity=TrigramSimilarity('name', tag_name)
+        ).filter(similarity__gte=threshold).order_by('-similarity')
+
 
 class Channel(models.Model):
     """Модель канала"""
@@ -107,52 +115,31 @@ class Order(models.Model):
     tags = models.ManyToManyField(Tag, related_name='orders', blank=True, verbose_name='Tags')
 
     # Параметры заказа
-    spm = models.DecimalField(
-        verbose_name='SPM',
-        max_digits=10,
-        decimal_places=2,
-        help_text='Spend per mille (стоимость за 1000 показов)'
-    )
-    budget = models.DecimalField(
-        verbose_name='Budget',
-        max_digits=15,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.01'))]
-    )
+    spm = models.DecimalField(verbose_name='SPM', max_digits=10, decimal_places=2,
+                              help_text='Spend per mille (стоимость за 1000 показов)')
+    budget = models.DecimalField(verbose_name='Budget', max_digits=15, decimal_places=2,
+                                 validators=[MinValueValidator(Decimal('0.01'))])
 
     # Поля для управления показами
-    total_views = models.PositiveIntegerField(
-        verbose_name='Total Views',
-        default=0,
-        help_text='Общее количество купленных показов'
-    )
-    shown_views = models.PositiveIntegerField(
-        verbose_name='Shown Views',
-        default=0,
-        help_text='Количество уже показанных просмотров'
-    )
-    remaining_views = models.PositiveIntegerField(
-        verbose_name='Remaining Views',
-        default=0,
-        help_text='Оставшееся количество показов'
+    total_views = models.PositiveIntegerField(verbose_name='Total Views', default=0,
+                                              help_text='Общее количество купленных показов')
+    shown_views = models.PositiveIntegerField(verbose_name='Shown Views', default=0,
+                                              help_text='Количество уже показанных просмотров')
+    remaining_views = models.PositiveIntegerField(verbose_name='Remaining Views', default=0,
+                                                  help_text='Оставшееся количество показов')
+    max_views_per_user = models.PositiveIntegerField(
+        verbose_name='Максимальное количество показов одному пользователю',
+        default=1,
+        help_text='Сколько раз можно показать эту рекламу одному пользователю'
     )
 
     # Статусы
-    completed = models.BooleanField(
-        verbose_name='Completed',
-        default=False,
-        help_text='True - реклама завершена (просмотры израсходованы)'
-    )
-    cancelled = models.BooleanField(
-        verbose_name='Cancelled',
-        default=False,
-        help_text='True - реклама отменена пользователем'
-    )
-    is_active = models.BooleanField(
-        verbose_name='Is Active',
-        default=True,
-        help_text='True - реклама активна и показывается'
-    )
+    completed = models.BooleanField(verbose_name='Completed', default=False,
+                                    help_text='True - реклама завершена (просмотры израсходованы)')
+    cancelled = models.BooleanField(verbose_name='Cancelled', default=False,
+                                    help_text='True - реклама отменена пользователем')
+    is_active = models.BooleanField(verbose_name='Is Active', default=True,
+                                    help_text='True - реклама активна и показывается')
 
     created_at = models.DateTimeField(verbose_name='Created At', auto_now_add=True)
     updated_at = models.DateTimeField(verbose_name='Updated At', auto_now=True)
@@ -202,7 +189,7 @@ class Order(models.Model):
             # Удаляем временный атрибут после использования
             delattr(self, '_tag_names')
 
-    def decrement_views(self):
+    def decrement_views(self, viewer_id=None):
         """Уменьшает количество оставшихся показов на 1"""
         if self.remaining_views > 0 and not self.cancelled:
             self.shown_views += 1
@@ -245,6 +232,40 @@ class Order(models.Model):
             return (Decimal(self.remaining_views) / Decimal(1000)) * self.spm
         return 0
 
+
+class AdView(models.Model):
+    """Модель для отслеживания показов рекламы конкретным пользователям"""
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='ad_views', verbose_name='Заказ')
+    viewer_id = models.CharField(verbose_name='ID пользователя (зрителя)', max_length=255,
+                                 help_text='ID пользователя, которому показывается реклама')
+    view_count = models.PositiveIntegerField(verbose_name='Количество просмотров', default=0,
+                                             help_text='Сколько раз этому пользователю уже показали эту рекламу')
+    last_viewed_at = models.DateTimeField(verbose_name='Последний просмотр', auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Показ рекламы'
+        verbose_name_plural = 'Показы рекламы'
+        unique_together = ['order', 'viewer_id']  # Одна запись на заказ и пользователя
+        indexes = [
+            models.Index(fields=['viewer_id', 'order']),
+            models.Index(fields=['last_viewed_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.viewer_id} - {self.order.order_name} ({self.view_count})"
+
+    def can_view_more(self, max_views):
+        """Проверяет, можно ли показать еще рекламу этому пользователю"""
+        return self.view_count < max_views
+
+    def increment_view(self):
+        """Увеличивает счетчик просмотров"""
+        self.view_count += 1
+        self.save()
+        return True
+
+
     # user_budget
     # Реализовать функцию cancel. Может прийти запрос, чтобы завершить рекламу до закачивания количества просмотров.
     # И в этот момент
@@ -264,3 +285,11 @@ class Order(models.Model):
 
     # Добавить два вида поиска. Первый поиск проверяем на наличие тега в канале. Второй поиск, если первый не нашел
     # ничего, значить есть вероятность, что юзер написал тег с ошибкой, поэтому сделаем поиск по триграмному сходству
+
+    # DONE ^^^^^^^^
+
+    # Нужно добавить функцию Где при оформление ордера, пользователь сможет выбрать сколько раз одному пользователю
+    # показать данный канал при поиске. Проще говоря, когда в приложение юзер вводит тег канала которого ищет, и при
+    # нахождение подходящего канала чтобы ему вывелось тот канал который нашел в бд. И при повторном запросе этим же
+    # пользователем этого же тега мы должны показать ему то количество раз этот канал сколько раз указал при заказе
+    # ордера.

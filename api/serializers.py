@@ -115,7 +115,8 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'channel_id', 'channel_name', 'order_name', 'tags', 'tag_names',
             'spm', 'budget', 'total_views', 'shown_views', 'remaining_views',
-            'completed', 'cancelled', 'is_active', 'created_at', 'updated_at'
+            'completed', 'cancelled', 'is_active', 'max_views_per_user',
+            'created_at', 'updated_at'
         ]
         read_only_fields = [
             'created_at', 'updated_at', 'tags', 'total_views',
@@ -179,32 +180,156 @@ class OrderSerializer(serializers.ModelSerializer):
 class OrderListSerializer(serializers.ModelSerializer):
     """Сериализатор для списка заказов"""
     tags = serializers.SerializerMethodField()
-    channel_tags = serializers.SerializerMethodField()
+    # channel_tags = serializers.SerializerMethodField()
     refund_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = [
             'id', 'channel_id', 'channel_name', 'order_name',
-            'tags', 'channel_tags', 'spm', 'budget',
+            'tags', 'spm', 'budget',
             'total_views', 'shown_views', 'remaining_views',
             'completed', 'cancelled', 'is_active', 'refund_amount',
-            'created_at'
+            'max_views_per_user',
+            'created_at', 'updated_at'
         ]
+
+    def get_user_views_count(self, obj):
+        """Получаем количество пользователей, которые просмотрели рекламу"""
+        return obj.ad_views.count()
 
     def get_tags(self, obj):
         """Получаем только имена тегов заказа"""
         return [tag.name for tag in obj.tags.all()]
 
-    def get_channel_tags(self, obj):
-        """Получаем только имена тегов канала"""
-        return [tag.name for tag in obj.channel_id.tags.all()]
+    # def get_channel_tags(self, obj):
+    #     """Получаем только имена тегов канала"""
+    #     return [tag.name for tag in obj.channel_id.tags.all()]
 
     def get_refund_amount(self, obj):
         """Получаем сумму возврата при отмене"""
         return obj.get_refund_amount()
 
 
+class OrderDetailSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для детальной информации о заказе
+
+    Поля:
+    - id: Уникальный идентификатор заказа в системе
+    - channel_id: ID связанного канала (ForeignKey -> Channel.id)
+    - channel_name: Название канала, в котором размещается реклама
+    - order_name: Название рекламного заказа (кампании)
+    - tags: Список тегов, связанных с заказом (ManyToMany -> Tag)
+    - spm: Spend per mille - стоимость 1000 показов в денежных единицах
+    - budget: Общий бюджет заказа, выделенный на рекламу
+    - total_views: Общее количество купленных показов
+    - shown_views: Количество уже показанных пользователям просмотров
+    - remaining_views: Оставшееся количество показов к отображению
+    - completed: Флаг завершения заказа (True = все показы израсходованы)
+    - cancelled: Флаг отмены заказа (True = заказ отменен пользователем)
+    - is_active: Флаг активности заказа (True = реклама показывается)
+    - refund_amount: Сумма, которая будет возвращена при отмене заказа
+    - max_views_per_user: Максимальное количество показов одному пользователю
+    - created_at: Дата и время создания заказа
+    - updated_at: Дата и время последнего обновления заказа
+    """
+    tags = serializers.SerializerMethodField()
+    refund_amount = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = [
+            'id', 'channel_id', 'channel_name', 'order_name', 'tags',
+            'spm', 'budget', 'total_views', 'shown_views', 'remaining_views',
+            'completed', 'cancelled', 'is_active', 'refund_amount',
+            'max_views_per_user', 'created_at', 'updated_at'
+        ]
+        read_only_fields = fields
+
+    def get_tags(self, obj):
+        """Преобразует связанные объекты Tag в СПИСОК строковых имен"""
+        return [tag.name for tag in obj.tags.all()]
+
+    def get_refund_amount(self, obj):
+        """
+        Вычисляет сумму возврата при отмене на основе оставшихся просмотров и SPM.
+        Использует метод модели get_refund_amount().
+        """
+        return obj.get_refund_amount()
+
+
+class OrderActivationSerializer(serializers.Serializer):
+    """Сериализатор для активации/деактивации заказа"""
+    order_id = serializers.IntegerField(required=True)
+    is_active = serializers.BooleanField(required=True)
+
+    def validate(self, data):
+        """
+        Валидация данных активации заказа
+        """
+        request = self.context.get('request')
+        user = request.user
+        order_id = data['order_id']
+        is_active = data['is_active']
+
+        try:
+            # Проверяем, существует ли заказ
+            order = Order.objects.get(id=order_id)
+
+            # Проверяем, принадлежит ли заказ текущему пользователю
+            if order.user != user:
+                raise serializers.ValidationError({
+                    "error": "У вас нет прав для изменения этого заказа"
+                })
+
+            # Сохраняем order в данных для использования во view
+            data['order'] = order
+
+            # Проверяем, можно ли изменять статус
+            validation_errors = self._validate_order_status(order, is_active)
+            if validation_errors:
+                raise serializers.ValidationError(validation_errors)
+
+        except Order.DoesNotExist:
+            raise serializers.ValidationError({
+                "error": "Заказ с указанным ID не найден"
+            })
+
+        return data
+
+    def _validate_order_status(self, order, new_is_active):
+        """
+        Проверка возможности изменения статуса заказа
+        """
+        errors = {}
+
+        # Проверяем, не отменен ли заказ
+        if order.cancelled:
+            errors['error'] = "Невозможно изменить статус отмененного заказа"
+            return errors
+
+        # Проверяем, не завершен ли заказ
+        if order.completed:
+            errors['error'] = "Невозможно изменить статус завершенного заказа"
+            return errors
+
+        # Если пытаемся установить тот же статус
+        if order.is_active == new_is_active:
+            status_text = "активен" if new_is_active else "неактивен"
+            errors['warning'] = f"Заказ уже {status_text}"
+
+        # Если пытаемся активировать заказ без оставшихся просмотров
+        if new_is_active and order.remaining_views <= 0:
+            errors['error'] = "Невозможно активировать заказ без оставшихся просмотров"
+
+        # Если пытаемся активировать заказ с нулевым бюджетом
+        if new_is_active and order.budget <= 0:
+            errors['error'] = "Невозможно активировать заказ с нулевым бюджетом"
+
+        return errors
+
+# НУЖНО ПЕРЕДЕЛАТЬ ОТВЕТЬ КОТОРЫЙ БУДЕТ ВОЗВРАЩЕНЬ В СЛУЧАЕ УСПЕХА
 class ChannelOrderSerializer(serializers.Serializer):
     """Сериализатор для создания канала и заказа"""
     # Поля канала
@@ -216,6 +341,8 @@ class ChannelOrderSerializer(serializers.Serializer):
     order_name = serializers.CharField(max_length=255, required=True)
     spm = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
     budget = serializers.DecimalField(max_digits=15, decimal_places=2, required=True)
+    max_views_per_user = serializers.IntegerField(default=1)
+    is_active = serializers.BooleanField(default=True)
 
     def validate(self, data):
         if data['spm'] <= 0:
@@ -265,6 +392,8 @@ class ChannelOrderSerializer(serializers.Serializer):
             order_name=validated_data['order_name'],
             spm=validated_data['spm'],
             budget=validated_data['budget'],
+            is_active=validated_data['is_active'],
+            max_views_per_user=validated_data['max_views_per_user'],
         )
 
         # Сохраняем теги во временный атрибут
@@ -287,24 +416,6 @@ class CancelOrderSerializer(serializers.Serializer):
         return data
 
 
-class ChannelStatsSerializer(serializers.Serializer):
-    """Сериализатор для статистики канала"""
-    channel_name = serializers.CharField()
-    total_orders = serializers.IntegerField()
-    active_orders = serializers.IntegerField()
-    total_views_purchased = serializers.IntegerField()
-    total_budget_spent = serializers.DecimalField(max_digits=15, decimal_places=2)
-    tags = serializers.ListField(child=serializers.CharField())
-    orders = OrderSerializer(many=True)
-
-
-class SearchResponseSerializer(serializers.Serializer):
-    """Сериализатор для ответа поиска"""
-    message = serializers.CharField()
-    channel = serializers.DictField()
-    remaining_views = serializers.IntegerField()
-
-
 class DepositSerializer(serializers.Serializer):
     """Сериализатор для пополнения баланса"""
     amount = serializers.DecimalField(
@@ -318,3 +429,68 @@ class DepositSerializer(serializers.Serializer):
         if data['amount'] <= 0:
             raise serializers.ValidationError({"amount": "Сумма должна быть больше 0"})
         return data
+
+
+class AdminDepositSerializer(serializers.Serializer):
+    """Сериализатор для пополнения баланса администратором"""
+    user_id = serializers.UUIDField(required=True, help_text='UUID пользователя')
+    amount = serializers.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        required=True,
+        min_value=Decimal('0.01'),
+        help_text='Сумма для пополнения'
+    )
+
+    def validate(self, data):
+        """
+        Валидация данных пополнения баланса
+        """
+        user_id = data['user_id']
+        amount = data['amount']
+
+        # Проверяем, что сумма положительная
+        if amount <= 0:
+            raise serializers.ValidationError({
+                "amount": "Сумма должна быть больше 0"
+            })
+
+        # Проверяем существование пользователя
+        try:
+            user = CustomUser.objects.get(user_id=user_id)
+            data['user'] = user  # Сохраняем объект пользователя для использования во view
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError({
+                "user_id": f"Пользователь с ID {user_id} не найден"
+            })
+
+        # Проверяем, что пользователь не пополняет свой баланс
+        # (если нужно разрешить пополнение своего баланса админом, удалите эту проверку)
+        request = self.context.get('request')
+        if request and request.user.user_id == user_id:
+            raise serializers.ValidationError({
+                "user_id": "Администратор не может пополнять свой собственный баланс через этот эндпоинт"
+            })
+
+        return data
+
+
+# class SearchResponseSerializer(serializers.Serializer):
+#     """Сериализатор для ответа поиска"""
+#     message = serializers.CharField()
+#     channel = serializers.DictField()
+#     remaining_views = serializers.IntegerField()
+
+
+# НУЖНО В ПРЕДСТАВЛЕНИЕ ЭТО ИСПОЛЬЗОВАТЬ. СЕЙЧАС ОН НЕ ИСПОЛЬЗУЕТСЯ
+class SearchResultSerializer(serializers.Serializer):
+    """Сериализатор для результата поиска"""
+    channel_id = serializers.CharField()
+    channel_name = serializers.CharField()
+    order_id = serializers.CharField()
+
+
+class SearchRequestSerializer(serializers.Serializer):
+    """Сериализатор для запроса поиска"""
+    tag = serializers.CharField(required=True)
+    viewer_id = serializers.CharField(required=True, help_text='ID пользователя, который ищет канал')

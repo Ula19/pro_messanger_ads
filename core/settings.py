@@ -27,10 +27,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG')
+# DEBUG = os.getenv('DEBUG', 'False').lower() in 'true'
+DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = ['*']
-
+# ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
 
 # Application definition
 
@@ -200,11 +201,3 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-
-{
-  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2NjQwMTAwNCwiaWF0IjoxNzY1Nzk2MjA0LCJqdGkiOiJlODY1NzU2OThjMzA0ZGVlOGQxZWY5ZDU5YTBmNzAzZCIsInVzZXJfaWQiOiIxIn0.30cNsy0sCxyySnzwY0by5tO8FGhpGP90gw5rdfnF3Hc",
-  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY1ODgyNjA0LCJpYXQiOjE3NjU3OTYyMDQsImp0aSI6IjYwYzQ5NzBmOGRhMzRmZDdiNzU2ZjkzZmJiZWM0Y2JkIiwidXNlcl9pZCI6IjEifQ.KIrMDeAY1xsx15vKDx1KtL0aYqm4vr7HSTlOKLOUlOg",
-  "user_id": "97e31fc1-5544-43dd-822e-fdee33910c54",
-  "username": "admin"
-}
