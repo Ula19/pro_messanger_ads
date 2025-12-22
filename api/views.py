@@ -107,8 +107,6 @@ class CreateChannelOrderView(generics.CreateAPIView):
 
         return Response({
             'message': 'Канал и заказ успешно созданы',
-            'channel': result['channel'],
-            'order': result['order']
         }, status=status.HTTP_201_CREATED)
 
 
