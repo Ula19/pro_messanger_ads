@@ -93,8 +93,8 @@ DATABASES = {
         'NAME': os.getenv('DATABASES_NAME'),
         'USER': os.getenv('DATABASES_USER'),
         'PASSWORD': os.getenv('DATABASES_PASSWORD'),
-        'HOST': '127.0.0.1',
-        'PORT': '5432',
+        'HOST': os.getenv('DATABASES_HOST', 'localhost'),
+        'PORT': os.getenv('DATABASES_PORT', '5432'),
     }
 }
 # Custom User Model
