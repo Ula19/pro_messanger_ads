@@ -1,8 +1,13 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import UserProfileView, UserLoginView, UserRegistrationView, CreateChannelOrderView, SearchChannelsView, \
-    OrderListView, ActiveOrderListView, BalanceView, DepositView, CancelOrderView, UserTokenVerifyView, \
-    OrderActivationView, OrderDetailView, AdminDepositView
+
+from api.views.auth_views import UserRegistrationView, UserProfileView, UserLoginView, UserTokenVerifyView
+from api.views.balance_views import BalanceView
+from api.views.search_views import SearchChannelsView
+from api.views.orders_views import OrderListView, ActiveOrderListView, OrderActivationView, OrderDetailView, \
+    CancelOrderView, CreateChannelOrderView
+
+
 
 urlpatterns = [
     # Регистрация и аутентификация
