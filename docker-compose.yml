@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: channel_user_2
       POSTGRES_PASSWORD: channel_pass123
     ports:
-      - "5433:5432"
+      - "5433:5433"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -21,7 +21,7 @@ services:
         sleep 5 &&
         python manage.py migrate &&
         python manage.py collectstatic --noinput &&
-        gunicorn --bind 0.0.0.0:8000 --workers 3 core.wsgi:application
+        gunicorn --bind 0.0.0.0:9000 --workers 3 core.wsgi:application
       "
     volumes:
       - static_volume:/app/staticfiles
@@ -36,7 +36,7 @@ services:
       - DATABASES_PORT=5432
       - ALLOWED_HOSTS=localhost,127.0.0.1 # ваш-домен.com
     ports:
-      - 127.0.0.1:8000:8000
+      - 9000:9000
     depends_on:
       - db
     restart: unless-stopped
@@ -45,7 +45,7 @@ services:
     image: nginx:alpine
     container_name: channel_nginx_2
     ports:
-      - "8080:8080"
+      - "8000:8000"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - static_volume:/app/staticfiles:ro
