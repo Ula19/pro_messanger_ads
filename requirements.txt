@@ -19,3 +19,4 @@ rpds-py==0.30.0
 sqlparse==0.5.4
 typing_extensions==4.15.0
 uritemplate==4.2.0
+gunicorn==21.2.0

@@ -90,9 +90,9 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DATABASES_NAME'),
-        'USER': os.getenv('DATABASES_USER'),
-        'PASSWORD': os.getenv('DATABASES_PASSWORD'),
+        'NAME': os.getenv('DATABASES_NAME', 'channel_db'),
+        'USER': os.getenv('DATABASES_USER', 'channel_user_2'),
+        'PASSWORD': os.getenv('DATABASES_PASSWORD', 'channel_pass123'),
         'HOST': os.getenv('DATABASES_HOST', 'localhost'),
         'PORT': os.getenv('DATABASES_PORT', '5432'),
     }
@@ -195,7 +195,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+MEDIA_ROOT = BASE_DIR / 'media'
+STATIC_URL = '/static/'
+MEDIA_URL = '/media/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
