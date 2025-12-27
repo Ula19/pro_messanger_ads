@@ -28,7 +28,7 @@ services:
       - media_volume:/app/media
     environment:
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-this}
-      - DEBUG=False
+      - DEBUG=True
       - DATABASES_NAME=channel_db
       - DATABASES_USER=channel_user_2
       - DATABASES_PASSWORD=channel_pass123
