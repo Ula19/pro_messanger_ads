@@ -3,7 +3,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from api.views.auth_views import UserRegistrationView, UserProfileView, UserLoginView, UserTokenVerifyView
 from api.views.balance_views import BalanceView
-from api.views.search_views import SearchChannelsView
+from api.views.search_views import SearchChannelsView, ClickView
 from api.views.orders_views import OrderListView, ActiveOrderListView, OrderActivationView, OrderDetailView, \
     CancelOrderView, CreateChannelOrderView
 
@@ -37,4 +37,5 @@ urlpatterns = [
 
     # Поиск каналов по тегу
     path('search/', SearchChannelsView.as_view(), name='search-channels'),
+    path('click/', ClickView.as_view(), name='click'),
 ]

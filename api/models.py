@@ -123,6 +123,8 @@ class Order(models.Model):
     # Поля для управления показами
     total_views = models.PositiveIntegerField(verbose_name='Total Views', default=0,
                                               help_text='Общее количество купленных показов')
+    clicks = models.PositiveIntegerField(verbose_name='Click channel', default=0,
+                                        help_text='Количество переходов на канал по клику')
     shown_views = models.PositiveIntegerField(verbose_name='Shown Views', default=0,
                                               help_text='Количество уже показанных просмотров')
     remaining_views = models.PositiveIntegerField(verbose_name='Remaining Views', default=0,
@@ -231,6 +233,11 @@ class Order(models.Model):
         if self.remaining_views > 0:
             return (Decimal(self.remaining_views) / Decimal(1000)) * self.spm
         return 0
+
+    def increment_clicks(self):
+        """Увеличить счетчик кликов на 1"""
+        self.clicks += 1
+        self.save(update_fields=['clicks'])
 
 
 class AdView(models.Model):

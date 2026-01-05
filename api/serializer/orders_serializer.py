@@ -48,7 +48,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'channel_id', 'channel_name', 'order_name', 'tags', 'tag_names',
-            'spm', 'budget', 'total_views', 'shown_views', 'remaining_views',
+            'spm', 'budget', 'total_views', 'shown_views', 'remaining_views', 'clicks',
             'completed', 'cancelled', 'is_active', 'max_views_per_user',
             'created_at', 'updated_at'
         ]
@@ -122,7 +122,7 @@ class OrderListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'channel_id', 'channel_name', 'order_name',
             'tags', 'spm', 'budget',
-            'total_views', 'shown_views', 'remaining_views',
+            'total_views', 'shown_views', 'remaining_views', 'clicks',
             'completed', 'cancelled', 'is_active', 'refund_amount',
             'max_views_per_user',
             'created_at', 'updated_at'
@@ -175,7 +175,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'channel_id', 'channel_name', 'order_name', 'tags',
-            'spm', 'budget', 'total_views', 'shown_views', 'remaining_views',
+            'spm', 'budget', 'total_views', 'shown_views', 'remaining_views', 'clicks',
             'completed', 'cancelled', 'is_active', 'refund_amount',
             'max_views_per_user', 'created_at', 'updated_at'
         ]

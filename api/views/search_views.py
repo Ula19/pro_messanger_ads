@@ -1,10 +1,11 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.db import transaction
+from rest_framework.views import APIView
 
 from api.models import Order, Tag, AdView
 
-from api.serializer.search_serializer import SearchRequestSerializer, SearchResultSerializer
+from api.serializer.search_serializer import SearchRequestSerializer, SearchResultSerializer, ClickOrderSerializer
 
 
 
@@ -118,3 +119,31 @@ class SearchChannelsView(generics.GenericAPIView):
         except Exception as e:
             print(f"Ошибка при показе рекламы: {e}")
             return False
+
+
+class ClickView(APIView):
+    serializer_class =  ClickOrderSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        order_id = serializer.validated_data['order_id']
+
+        try:
+            order = Order.objects.get(id=order_id)
+            order.increment_clicks()
+            return Response(
+                status=status.HTTP_204_NO_CONTENT
+            )
+        except Order.DoesNotExist:
+            return Response(
+                {'error': 'Ордер не найден'},
+                status=status.HTTP_404_NOT_FOUND
+            )

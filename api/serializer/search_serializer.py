@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from api.models import Order
+
 
 # class SearchResponseSerializer(serializers.Serializer):
 #     """Сериализатор для ответа поиска"""
@@ -20,3 +22,14 @@ class SearchRequestSerializer(serializers.Serializer):
     """Сериализатор для запроса поиска"""
     tag = serializers.CharField(required=True)
     viewer_id = serializers.CharField(required=True, help_text='ID пользователя, который ищет канал')
+
+
+class ClickOrderSerializer(serializers.Serializer):
+    order_id = serializers.IntegerField(required=True)
+    user_id = serializers.CharField(required=True, help_text='ID пользователя который посмотрел канал')
+
+    def validate_order_id(self, value):
+        # Проверяем, что ордер существует
+        if not Order.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Ордер не найден")
+        return value
