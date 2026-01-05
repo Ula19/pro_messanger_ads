@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from api.models import Channel, Order, Tag, Balance
@@ -132,6 +133,7 @@ class OrderListSerializer(serializers.ModelSerializer):
         """Получаем количество пользователей, которые просмотрели рекламу"""
         return obj.ad_views.count()
 
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_tags(self, obj):
         """Получаем только имена тегов заказа"""
         return [tag.name for tag in obj.tags.all()]
@@ -140,6 +142,7 @@ class OrderListSerializer(serializers.ModelSerializer):
     #     """Получаем только имена тегов канала"""
     #     return [tag.name for tag in obj.channel_id.tags.all()]
 
+    @extend_schema_field(serializers.DecimalField(max_digits=15, decimal_places=2))
     def get_refund_amount(self, obj):
         """Получаем сумму возврата при отмене"""
         return obj.get_refund_amount()
@@ -181,10 +184,12 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_tags(self, obj):
         """Преобразует связанные объекты Tag в СПИСОК строковых имен"""
         return [tag.name for tag in obj.tags.all()]
 
+    @extend_schema_field(serializers.DecimalField(max_digits=15, decimal_places=2))
     def get_refund_amount(self, obj):
         """
         Вычисляет сумму возврата при отмене на основе оставшихся просмотров и SPM.
