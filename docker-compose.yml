@@ -1,3 +1,5 @@
+name: 'pro_messanger ads backend'
+
 services:
   db:
     image: postgres:15-alpine
@@ -26,15 +28,18 @@ services:
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+    env_file:
+      - .env
     environment:
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-this}
-      - DEBUG=True
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG}
       - DATABASES_NAME=channel_db
       - DATABASES_USER=channel_user_2
       - DATABASES_PASSWORD=channel_pass123
       - DATABASES_HOST=db
       - DATABASES_PORT=5432
-      - ALLOWED_HOSTS=localhost,127.0.0.1 # ваш-домен.com
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+#      - ALLOWED_HOSTS=localhost,127.0.0.1 # ваш-домен.com
     ports:
       - 9000:9000
     depends_on:

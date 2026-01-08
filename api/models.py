@@ -28,11 +28,21 @@ class Balance(models.Model):
         verbose_name='User'
     )
     amount = models.DecimalField(
-        verbose_name='Balance Amount',
+        verbose_name='Сумма баланса',
         max_digits=15,
         decimal_places=2,
         default=0.00,
         validators=[MinValueValidator(Decimal('0.00'))]
+    )
+    add_amount = models.DecimalField(
+        verbose_name='Пополнить',
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=0.00,
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text='Сумма будет ДОБАВЛЕНА к балансу'
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -64,7 +74,7 @@ class Balance(models.Model):
 
 class Tag(models.Model):
     """Модель тегов"""
-    name = models.CharField(max_length=100, unique=True, verbose_name='Tag Name')
+    name = models.CharField(max_length=100, unique=True, verbose_name='Имя тега')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
