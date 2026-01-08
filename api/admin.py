@@ -17,7 +17,7 @@ class BalanceAdmin(admin.ModelAdmin):
     list_editable = ('add_amount',)
     list_per_page = 20
     ordering = ('amount',)
-    readonly_fields = ('user',)
+    # readonly_fields = ('user',)
     search_fields = ('user__username', 'user__user_id',)
     search_help_text = 'USERNAME ni yoki USER ID ni kiritng'
 

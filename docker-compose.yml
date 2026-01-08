@@ -32,14 +32,15 @@ services:
       - .env
     environment:
       - SECRET_KEY=${SECRET_KEY}
-      - DEBUG=${DEBUG}
+      - DEBUG=True
+#      - DEBUG=${DEBUG}
       - DATABASES_NAME=channel_db
       - DATABASES_USER=channel_user_2
       - DATABASES_PASSWORD=channel_pass123
       - DATABASES_HOST=db
       - DATABASES_PORT=5432
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-#      - ALLOWED_HOSTS=localhost,127.0.0.1 # ваш-домен.com
+#      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - ALLOWED_HOSTS=localhost,127.0.0.1 # ваш-домен.com
     ports:
       - 9000:9000
     depends_on:
