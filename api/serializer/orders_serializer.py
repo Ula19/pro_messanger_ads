@@ -37,6 +37,7 @@ class ChannelSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     """Сериализатор для модели Order"""
+    channel_id = serializers.SerializerMethodField()
     tags = TagSerializer(many=True, read_only=True)
     tag_names = serializers.ListField(
         child=serializers.CharField(),
@@ -57,6 +58,9 @@ class OrderSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'tags', 'total_views',
             'shown_views', 'remaining_views', 'completed'
         ]
+
+    def get_channel_id(self, obj):
+        return str(obj.channel_id.channel_id)
 
     def validate(self, data):
         # Проверяем, что у пользователя достаточно средств
@@ -114,6 +118,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class OrderListSerializer(serializers.ModelSerializer):
     """Сериализатор для списка заказов"""
+    channel_id = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
     # channel_tags = serializers.SerializerMethodField()
     refund_amount = serializers.SerializerMethodField()
@@ -128,6 +133,9 @@ class OrderListSerializer(serializers.ModelSerializer):
             'max_views_per_user',
             'created_at', 'updated_at'
         ]
+
+    def get_channel_id(self, obj):
+        return str(obj.channel_id.channel_id)
 
     def get_user_views_count(self, obj):
         """Получаем количество пользователей, которые просмотрели рекламу"""
@@ -173,6 +181,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     """
     tags = serializers.SerializerMethodField()
     refund_amount = serializers.SerializerMethodField()
+    channel_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -183,6 +192,9 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             'max_views_per_user', 'created_at', 'updated_at'
         ]
         read_only_fields = fields
+
+    def get_channel_id(self, obj):
+        return str(obj.channel_id.channel_id)
 
     @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_tags(self, obj):

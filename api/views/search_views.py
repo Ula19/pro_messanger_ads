@@ -122,7 +122,7 @@ class SearchChannelsView(generics.GenericAPIView):
 
 
 class ClickView(APIView):
-    serializer_class =  ClickOrderSerializer
+    serializer_class = ClickOrderSerializer
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
