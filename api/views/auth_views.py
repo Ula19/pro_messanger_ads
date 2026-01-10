@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -19,6 +20,20 @@ class UserRegistrationView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
 
 
+@extend_schema(
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "refresh": {"type": "string"},
+                "access": {"type": "string"},
+                "user_id": {"type": "string", "format": "uuid"},
+                "username": {"type": "string"},
+                "is_admin": {"type": "boolean"},
+            }
+        }
+    }
+)
 class UserLoginView(TokenObtainPairView):
     """Вход пользователя"""
     serializer_class = UserLoginSerializer
@@ -34,6 +49,14 @@ class UserProfileView(generics.RetrieveAPIView):
         return self.request.user
 
 
+@extend_schema(responses={
+    200: {
+        "type": "object",
+        "properties": {
+            "status": {"type": "string"},
+        }
+    }
+})
 class UserTokenVerifyView(TokenVerifyView):
     def post(self, request: Request, *args, **kwargs) -> Response:
         response = super().post(request, *args, **kwargs)

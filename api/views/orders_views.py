@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -11,6 +12,14 @@ from api.serializer.orders_serializer import OrderDetailSerializer, ChannelOrder
 
 
 
+@extend_schema(responses={
+    201: {
+        "type": "object",
+        "properties": {
+            "message": {"type": "string"},
+        }
+    }
+})
 class CreateChannelOrderView(generics.CreateAPIView):
     """Создание канала и заказа в одном запросе"""
     serializer_class = ChannelOrderSerializer
