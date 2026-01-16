@@ -201,7 +201,7 @@ class Order(models.Model):
             # Удаляем временный атрибут после использования
             delattr(self, '_tag_names')
 
-    def decrement_views(self, viewer_id=None):
+    def decrement_views(self):
         """Уменьшает количество оставшихся показов на 1"""
         if self.remaining_views > 0 and not self.cancelled:
             self.shown_views += 1
