@@ -40,51 +40,31 @@ class CreateChannelOrderView(generics.CreateAPIView):
 
 class CancelOrderView(generics.GenericAPIView):
     """Отмена заказа по ID в URL"""
-    serializer_class = CancelOrderSerializer
+    # serializer_class = CancelOrderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request, order_id):
+    @extend_schema(responses={204: None})
+    def get(self, request, order_id):
         """
         Отменяет заказ пользователя.
         Получает order_id из параметра пути URL.
         """
         try:
-            # Все операции с базой данных, включая выборку с блокировкой и обновление,
-            # должны быть внутри ОДНОЙ транзакции.
             with transaction.atomic():
-                # 1. Находим заказ и проверяем права доступа
-                # select_for_update() блокирует строку заказа для других транзакций,
-                # что гарантирует целостность при конкурентном доступе.
                 order = Order.objects.select_for_update().get(id=order_id, user=request.user)
 
-                # 2. Валидация состояния заказа перед отменой
                 validation_error = self._validate_order_for_cancellation(order)
                 if validation_error:
-                    # Если валидация не прошла, транзакция откатится сама
                     return Response(
                         {'error': validation_error},
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
-                # 3. Выполняем отмену. Метод cancel_order() вызывает order.save()
                 refund_amount = order.cancel_order()
 
-            # 4. Возвращаем успешный ответ ВНЕ транзакции
-            return Response({
-                'message': 'Заказ успешно отменен.',
-                'refund_amount': refund_amount,
-                'new_balance': request.user.balance.amount,
-                'order_status': {
-                    'id': order.id,
-                    'order_name': order.order_name,
-                    'cancelled': order.cancelled,
-                    'is_active': order.is_active,
-                    'remaining_views': order.remaining_views
-                }
-            }, status=status.HTTP_200_OK)
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
         except Order.DoesNotExist:
-            # Этот блок находится вне транзакции, так как исключение выбрасывается при запросе
             return Response(
                 {'error': 'Заказ не найден или у вас нет прав на его отмену.'},
                 status=status.HTTP_404_NOT_FOUND

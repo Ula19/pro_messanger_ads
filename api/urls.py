@@ -23,17 +23,15 @@ urlpatterns = [
     path('balance/', BalanceView.as_view(), name='balance'),
     # path('balance/deposit/', DepositView.as_view(), name='deposit'),
     # path('admin/balance/deposit/', AdminDepositView.as_view(), name='admin_deposit'),
-    # Создание канала и заказа
-    path('channel_id-order/create/', CreateChannelOrderView.as_view(), name='create_channel_order'),
 
-    # Отмена заказа
-    path('orders/<int:order_id>/cancel/', CancelOrderView.as_view(), name='cancel_order'),
 
     # Списки заказов
-    path('orders/<int:order_id>/', OrderDetailView.as_view(), name='order-detail'),
+    path('order/create/', CreateChannelOrderView.as_view(), name='create_channel_order'),
     path('orders/all/', OrderListView.as_view(), name='all-orders'),
     path('orders/active/', ActiveOrderListView.as_view(), name='active-orders'),
-    path('orders/status/', OrderActivationView.as_view(), name='order_activation'),
+    path('orders/change_status/', OrderActivationView.as_view(), name='order_activation'),
+    path('orders/<str:order_id>/detail', OrderDetailView.as_view(), name='order-detail'),
+    path('orders/<str:order_id>/cancel/', CancelOrderView.as_view(), name='cancel_order'),
 
     # Поиск каналов по тегу
     path('search/', SearchChannelsView.as_view(), name='search-channels'),

@@ -193,6 +193,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    @extend_schema_field(serializers.CharField())
     def get_channel_id(self, obj):
         return str(obj.channel_id.channel_id)
 

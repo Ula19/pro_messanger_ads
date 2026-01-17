@@ -176,9 +176,9 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API for managing channels and orders',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
-    # "SWAGGER_UI_SETTINGS": {
-    #     "persistAuthorization": True,  # не сбрасывать авторизацию
-    # },
+    "SWAGGER_UI_SETTINGS": {
+        "persistAuthorization": True,  # не сбрасывать авторизацию
+    },
 
     # # Автоматическое определение типов для SerializerMethodField
     # 'POSTPROCESSING_HOOKS': [

@@ -110,7 +110,9 @@ class ChatAdOrder(models.Model):
 
     def save(self, *args, **kwargs):
         """При сохранении заказа рассчитываем количество показов"""
-        is_new = self.pk is None
+        # ИСПРАВЛЕНИЕ: Используем _state.adding вместо pk is None
+        # так как UUID присваивается до сохранения
+        is_new = self._state.adding
 
         # Если это новый заказ, рассчитываем количество показов
         if is_new and self.budget and self.spm:
@@ -158,6 +160,12 @@ class ChatAdOrder(models.Model):
 
             self.save()
             return refund_amount
+        return 0
+
+    def get_refund_amount(self):
+        """Рассчитывает сумму возврата при отмене"""
+        if self.remaining_views > 0:
+            return (Decimal(self.remaining_views) / Decimal(1000)) * self.spm
         return 0
 
 
