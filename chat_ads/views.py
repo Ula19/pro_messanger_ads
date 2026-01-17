@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError
 
 from api.models import Balance
 from .models import ChatAdOrder, ChatAdView

@@ -29,11 +29,11 @@ urlpatterns = [
     path('order/create/', CreateChannelOrderView.as_view(), name='create_channel_order'),
     path('orders/all/', OrderListView.as_view(), name='all-orders'),
     path('orders/active/', ActiveOrderListView.as_view(), name='active-orders'),
-    path('orders/change_status/', OrderActivationView.as_view(), name='order_activation'),
-    path('orders/<str:order_id>/detail', OrderDetailView.as_view(), name='order-detail'),
-    path('orders/<str:order_id>/cancel/', CancelOrderView.as_view(), name='cancel_order'),
+    path('order/change_status/', OrderActivationView.as_view(), name='order_activation'),
+    path('order/<str:order_id>/detail', OrderDetailView.as_view(), name='order-detail'),
+    path('order/<str:order_id>/cancel/', CancelOrderView.as_view(), name='cancel_order'),
 
     # Поиск каналов по тегу
-    path('search/', SearchChannelsView.as_view(), name='search-channels'),
-    path('click/', ClickView.as_view(), name='click'),
+    path('order/search/', SearchChannelsView.as_view(), name='search-channels'),
+    path('order/click/', ClickView.as_view(), name='click'),
 ]
