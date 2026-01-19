@@ -7,7 +7,7 @@ from .views import ChatAdOrderCreateView, ChatAdOrderListView, ChatAdOrderDetail
 urlpatterns = [
     path('order/create/', ChatAdOrderCreateView.as_view()),
     path('orders/all/', ChatAdOrderListView.as_view()),
-    path('order/<str:order_id>/detail/', ChatAdOrderDetailView.as_view()),
+    path('order/<uuid:order_id>/detail/', ChatAdOrderDetailView.as_view()),
     path('orders/active/', ChatAdActiveOrderListView.as_view()),
-    path('order/<str:order_id>/cancel/', ChatAdCancelOrderView.as_view(), name='cancel_order'),
+    path('order/<uuid:order_id>/cancel/', ChatAdCancelOrderView.as_view(), name='cancel_order'),
 ]

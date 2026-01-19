@@ -47,6 +47,9 @@ class ChatAdOrderCreateView(generics.CreateAPIView):
             serializer.save(user=user)
 
 
+
+
+
 class ChatAdOrderListView(generics.ListAPIView):
     serializer_class = ChatAdOrderSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -94,7 +97,7 @@ class ChatAdCancelOrderView(generics.GenericAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(responses={204: None})
-    def get(self, request, order_id):
+    def post(self, request, order_id):
         """
         Отменяет заказ пользователя.
         Получает order_id из параметра пути URL.

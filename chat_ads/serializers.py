@@ -19,8 +19,9 @@ class ChatAdOrderSerializer(serializers.ModelSerializer):
             'completed', 'cancelled', 'is_active', 'created_at'
         ]
         read_only_fields = [
-            'order_id', 'user_id', 'total_views', 'clicks', 'shown_views', 'refund_amount',
-            'remaining_views', 'completed',  'cancelled', 'is_active', 'created_at'
+            'order_id', 'user_id', 'total_views', 'clicks', 'image', 'video',
+            'shown_views', 'refund_amount', 'remaining_views',
+            'completed',  'cancelled', 'is_active', 'created_at'
         ]
 
     @extend_schema_field(serializers.CharField())
@@ -67,6 +68,8 @@ class ChatAdOrderSerializer(serializers.ModelSerializer):
         if value < -1:
             raise serializers.ValidationError("Значение не может быть меньше -1")
         return value
+
+
 
 
 class ChatAdViewSerializer(serializers.ModelSerializer):

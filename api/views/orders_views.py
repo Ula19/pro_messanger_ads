@@ -44,7 +44,7 @@ class CancelOrderView(generics.GenericAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(responses={204: None})
-    def get(self, request, order_id):
+    def post(self, request, order_id):
         """
         Отменяет заказ пользователя.
         Получает order_id из параметра пути URL.
