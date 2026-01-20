@@ -2,8 +2,41 @@ import uuid
 from decimal import Decimal
 
 from django.conf import settings
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, FileExtensionValidator
 from django.db import models
+
+
+class ChatAdMedia(models.Model):
+    """
+    Временное (или постоянное) хранилище для медиафайлов.
+    Файл загружается сюда ДО создания заказа.
+    """
+
+    class MediaType(models.TextChoices):
+        IMAGE = 'IMAGE', 'Изображение'
+        VIDEO = 'VIDEO', 'Видео'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='chat_ad_media')
+
+    file = models.FileField(
+        upload_to='chat_ads/temp/',
+        verbose_name='Файл',
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=['jpg', 'jpeg', 'png', 'mp4', 'mov']
+            )
+        ]
+        )
+    media_type = models.CharField(max_length=10, choices=MediaType.choices)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # Флаг, привязан ли файл к заказу (чтобы потом удалять мусор)
+    is_linked = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.media_type} by {self.user.username} ({self.id})"
 
 
 class ChatAdOrder(models.Model):
@@ -21,20 +54,15 @@ class ChatAdOrder(models.Model):
     channels = models.TextField(verbose_name='Каналы для показа',
                                 help_text='Названия каналов через запятую (например: "channel1, channel2")')
 
-    # Медиа файлы
-    image = models.ImageField(
-        verbose_name='Изображение',
-        upload_to='chat_ads/images/',
-        blank=True,
+    # ВМЕСТО старых полей image и video делаем связь с Media
+    # null=True, blank=True — если реклама только текстовая
+    media_url = models.ForeignKey(
+        ChatAdMedia,
+        on_delete=models.SET_NULL,  # Если медиа удалят, заказ останется (но без картинки)
         null=True,
-        help_text='Изображение для рекламы'
-    )
-    video = models.FileField(
-        verbose_name='Видео',
-        upload_to='chat_ads/videos/',
         blank=True,
-        null=True,
-        help_text='Видео для рекламы'
+        related_name='orders',
+        verbose_name='Медиа-вложение'
     )
 
     # Параметры заказа
@@ -143,7 +171,7 @@ class ChatAdOrder(models.Model):
 
     def cancel_order(self):
         """Отменяет заказ и возвращает средства за оставшиеся показы"""
-        if not self.cancelled and self.is_active:
+        if not self.cancelled:
             self.cancelled = True
             self.is_active = False
             self.completed = False

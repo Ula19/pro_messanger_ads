@@ -52,6 +52,7 @@ INSTALLED_APPS = [
 
     'api',
     'chat_ads',
+    'common',
 ]
 
 MIDDLEWARE = [

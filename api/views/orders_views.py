@@ -1,12 +1,12 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from django.http import Http404
 from django.db import transaction
 
-from api.models import Order
+from common.pagination import StandardResultsSetPagination
 
+from api.models import Order
 from api.serializer.orders_serializer import OrderDetailSerializer, ChannelOrderSerializer, OrderActivationSerializer, \
     ChannelSerializer, OrderSerializer, OrderListSerializer, TagSerializer, CancelOrderSerializer
 
@@ -79,17 +79,8 @@ class CancelOrderView(generics.GenericAPIView):
         return None
 
 
-class StandardResultsSetPagination(PageNumberPagination):
-    """Пагинация для списков"""
-    page_size = 5
-    page_size_query_param = 'page_size'
-    max_page_size = 100
-
-
 class OrderListView(generics.ListAPIView):
     """Получение всех заказов текущего пользователя"""
-    # serializer_class = OrderListSerializer  # Пусть пока постоит. Сейчас OrderListSerializer делает тоже самое
-    # что и OrderDetailSerializer
     serializer_class = OrderDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardResultsSetPagination
@@ -210,7 +201,7 @@ class OrderActivationView(generics.GenericAPIView):
                 'id': order.id,
                 'channel_name': order.channel_name,
                 'order_name': order.order_name,
-                'is_active': order.is_active,
+                'is_active': (not order.is_active),
                 'remaining_views': order.remaining_views,
                 'completed': order.completed,
                 'cancelled': order.cancelled,

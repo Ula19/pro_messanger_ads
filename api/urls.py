@@ -30,7 +30,7 @@ urlpatterns = [
     path('orders/all/', OrderListView.as_view(), name='all-orders'),
     path('orders/active/', ActiveOrderListView.as_view(), name='active-orders'),
     path('order/change_status/', OrderActivationView.as_view(), name='order_activation'),
-    path('order/<uuid:order_id>/detail', OrderDetailView.as_view(), name='order-detail'),
+    path('order/<uuid:order_id>/detail/', OrderDetailView.as_view(), name='order-detail'),
     path('order/<uuid:order_id>/cancel/', CancelOrderView.as_view(), name='cancel_order'),
 
     # Поиск каналов по тегу

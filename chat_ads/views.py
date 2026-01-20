@@ -1,53 +1,74 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status, permissions
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 
+from common.pagination import StandardResultsSetPagination
+
 from api.models import Balance
-from .models import ChatAdOrder, ChatAdView
-from .serializers import ChatAdOrderSerializer, ChatAdViewSerializer
+from .models import ChatAdOrder, ChatAdView, ChatAdMedia
+from .serializers import ChatAdViewSerializer, ChatAdMediaSerializer, ChatAdOrderSerializer
 from decimal import Decimal
 
 
 
-class StandardResultsSetPagination(PageNumberPagination):
-    """Пагинация для списков"""
-    page_size = 5
-    page_size_query_param = 'page_size'
-    max_page_size = 100
+class ChatAdMediaUploadView(generics.CreateAPIView):
+    """
+    Загрузка фото или видео.
+    Возвращает UUID файла, который нужно вставить в создание заказа.
+    """
+    queryset = ChatAdMedia.objects.all()
+    serializer_class = ChatAdMediaSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)  # Важно для файлов
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
+@extend_schema(responses={201: None})
 class ChatAdOrderCreateView(generics.CreateAPIView):
-    """Создание рекламы в чатах"""
-    queryset = ChatAdOrder.objects.all().select_related('user')
+    """
+    Создание заказа и оплата.
+    В поле media_id принимаем UUID полученный на прошлом шаге.
+    """
     serializer_class = ChatAdOrderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        budget = serializer.validated_data['budget']
         user = self.request.user
+        budget = serializer.validated_data['budget']
 
-        # Открываем транзакцию: всё или ничего
+        # Получаем объект медиа из validated_data (валидатор уже вернул объект, а не ID)
+        media_obj = serializer.validated_data.pop('media_id', None)
+
         with transaction.atomic():
-            # 1. Получаем баланс с блокировкой строки (защита от двойного списания)
+            # 1. Списание денег
             balance = Balance.objects.select_for_update().get(user=user)
-
-            # 2. Проверяем средства
             if balance.amount < budget:
                 raise ValidationError("Недостаточно средств на балансе")
-
-            # 3. Списываем средства
             balance.withdraw(budget)
 
-            # 4. Создаем заказ
-            serializer.save(user=user)
+            # 2. Сохранение заказа
+            order = serializer.save(user=user, media_url=media_obj)
 
+            # 3. Помечаем медиа как использованное (чтобы не удалить сборщиком мусора)
+            if media_obj:
+                media_obj.is_linked = True
+                media_obj.save(update_fields=['is_linked'])
 
-
+    def create(self, request, *args, **kwargs):
+        """
+        Переопределяем для возврата 204 вместо стандартного 201 с данными
+        """
+        response = super().create(request, *args, **kwargs)
+        # Заменяем 201 на 204 и убираем контент
+        return Response(status=status.HTTP_201_CREATED)
 
 
 class ChatAdOrderListView(generics.ListAPIView):

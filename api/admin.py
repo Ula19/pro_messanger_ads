@@ -10,6 +10,23 @@ class UserAdmin(UserAdmin):
     list_per_page = 20
     search_help_text = 'USERNAME ni yoki USER ID ni kiritng'
 
+    fieldsets = (
+        (None, {'fields': ('username', 'password')}),
+        ('Personal info', {'fields': ('first_name', 'last_name', 'email')}),
+        ('Permissions', {
+            'fields': ('is_active', 'is_staff', 'is_superuser', 'is_admin', 'groups', 'user_permissions'),
+        }),
+        ('Important dates', {'fields': ('last_login', 'date_joined')}),
+    )
+
+    # Поля при создании пользователя
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'email', 'password1', 'password2', 'is_admin', 'is_staff', 'is_active'),
+        }),
+    )
+
 
 @admin.register(Balance)
 class BalanceAdmin(admin.ModelAdmin):
