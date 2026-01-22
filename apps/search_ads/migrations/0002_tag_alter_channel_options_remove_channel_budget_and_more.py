@@ -11,7 +11,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0001_initial'),
+        ('search_ads', '0001_initial'),
     ]
 
     operations = [
@@ -127,9 +127,9 @@ class Migration(migrations.Migration):
                 ('is_active', models.BooleanField(default=True, help_text='True - реклама активна и показывается', verbose_name='Is Active')),
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='Created At')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='Updated At')),
-                ('channel_id', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='orders', to='api.channel')),
+                ('channel_id', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='orders', to='search_ads.channel')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='orders', to=settings.AUTH_USER_MODEL, verbose_name='User')),
-                ('tags', models.ManyToManyField(blank=True, related_name='orders', to='api.tag', verbose_name='Tags')),
+                ('tags', models.ManyToManyField(blank=True, related_name='orders', to='search_ads.tag', verbose_name='Tags')),
             ],
             options={
                 'verbose_name': 'Order',
@@ -140,6 +140,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='channel',
             name='tags',
-            field=models.ManyToManyField(blank=True, related_name='channels', to='api.tag'),
+            field=models.ManyToManyField(blank=True, related_name='channels', to='search_ads.tag'),
         ),
     ]

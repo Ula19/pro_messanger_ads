@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0002_tag_alter_channel_options_remove_channel_budget_and_more'),
+        ('search_ads', '0002_tag_alter_channel_options_remove_channel_budget_and_more'),
     ]
 
     operations = [

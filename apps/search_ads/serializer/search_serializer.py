@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.api.models import Order
+from apps.search_ads.models import Order
 
 
 # class SearchResponseSerializer(serializers.Serializer):

@@ -26,7 +26,14 @@ class ChatAdMediaUploadView(generics.CreateAPIView):
         serializer.save(user=self.request.user)
 
 
-@extend_schema(responses={201: None})
+@extend_schema(responses={
+    201: {
+        "type": "object",
+        "properties": {
+            "message": {"type": "string"},
+        }
+    }
+})
 class ChatAdOrderCreateView(generics.CreateAPIView):
     """
     Создание заказа и оплата.
@@ -63,7 +70,9 @@ class ChatAdOrderCreateView(generics.CreateAPIView):
         """
         response = super().create(request, *args, **kwargs)
         # Заменяем 201 на 204 и убираем контент
-        return Response(status=status.HTTP_201_CREATED)
+        return Response({
+            'message': 'Канал и заказ успешно созданы',
+        }, status=status.HTTP_201_CREATED)
 
 
 class ChatAdOrderListView(generics.ListAPIView):

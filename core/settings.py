@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
 
-    'apps.api',
+    'apps.search_ads',
     'apps.chat_ads',
     'apps.common',
     'apps.account',

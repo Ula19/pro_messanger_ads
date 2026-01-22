@@ -1,7 +1,7 @@
 from django.urls import path
 
-from apps.api.views.search_views import SearchChannelsView, ClickView
-from apps.api.views.orders_views import OrderListView, ActiveOrderListView, OrderActivationView, OrderDetailView, \
+from apps.search_ads.views.search_views import SearchChannelsView, ClickView
+from apps.search_ads.views.orders_views import OrderListView, ActiveOrderListView, OrderActivationView, OrderDetailView, \
     CancelOrderView, CreateChannelOrderView
 
 

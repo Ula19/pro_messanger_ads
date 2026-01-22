@@ -6,8 +6,8 @@ from django.db import transaction
 
 from apps.common.pagination import StandardResultsSetPagination
 
-from apps.api.models import Order
-from apps.api.serializer.orders_serializer import OrderDetailSerializer, ChannelOrderSerializer, OrderActivationSerializer
+from apps.search_ads.models import Order
+from apps.search_ads.serializer.orders_serializer import OrderDetailSerializer, ChannelOrderSerializer, OrderActivationSerializer
 
 
 @extend_schema(responses={

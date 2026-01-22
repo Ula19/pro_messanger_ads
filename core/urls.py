@@ -24,7 +24,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/', include('apps.api.urls')),
+    path('api/', include('apps.search_ads.urls')),
     path('api/', include('apps.billing.urls')),
     path('api/auth/', include('apps.account.urls')),
     path('api/chat_post/', include('apps.chat_ads.urls')),
@@ -32,3 +32,4 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,7 +1,7 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from apps.api.models import Channel, Order, Tag
+from apps.search_ads.models import Channel, Order, Tag
 from apps.billing.models import Balance
 
 

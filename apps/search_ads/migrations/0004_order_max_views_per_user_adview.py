@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('api', '0003_alter_channel_channel_name'),
+        ('search_ads', '0003_alter_channel_channel_name'),
     ]
 
     operations = [
@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
                 ('view_count', models.PositiveIntegerField(default=0, help_text='Сколько раз этому пользователю уже показали эту рекламу', verbose_name='Количество просмотров')),
                 ('last_viewed_at', models.DateTimeField(auto_now=True, verbose_name='Последний просмотр')),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('order', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ad_views', to='api.order', verbose_name='Заказ')),
+                ('order', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ad_views', to='search_ads.order', verbose_name='Заказ')),
             ],
             options={
                 'verbose_name': 'Показ рекламы',
