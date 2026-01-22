@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class PostAdsConfig(AppConfig):
+class ApiConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'chat_ads'
+    name = 'apps.api'

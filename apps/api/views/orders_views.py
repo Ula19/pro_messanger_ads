@@ -4,12 +4,10 @@ from rest_framework.response import Response
 from django.http import Http404
 from django.db import transaction
 
-from common.pagination import StandardResultsSetPagination
+from apps.common.pagination import StandardResultsSetPagination
 
-from api.models import Order
-from api.serializer.orders_serializer import OrderDetailSerializer, ChannelOrderSerializer, OrderActivationSerializer, \
-    ChannelSerializer, OrderSerializer, OrderListSerializer, TagSerializer, CancelOrderSerializer
-
+from apps.api.models import Order
+from apps.api.serializer.orders_serializer import OrderDetailSerializer, ChannelOrderSerializer, OrderActivationSerializer
 
 
 @extend_schema(responses={

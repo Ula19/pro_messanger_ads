@@ -1,20 +1,15 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status, permissions
-from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from django.db import transaction
-from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 
-from common.pagination import StandardResultsSetPagination
+from apps.common.pagination import StandardResultsSetPagination
 
-from api.models import Balance
-from .models import ChatAdOrder, ChatAdView, ChatAdMedia
-from .serializers import ChatAdViewSerializer, ChatAdMediaSerializer, ChatAdOrderSerializer
-from decimal import Decimal
-
+from apps.billing.models import Balance
+from .models import ChatAdOrder, ChatAdMedia
+from .serializers import ChatAdMediaSerializer, ChatAdOrderSerializer
 
 
 class ChatAdMediaUploadView(generics.CreateAPIView):

@@ -3,7 +3,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 
-from api.models import Balance
+from apps.billing.models import Balance
 
 
 User = get_user_model()

@@ -2,9 +2,8 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 
-from api.models import Balance
-
-from api.serializer.balance_serializer import BalanceSerializer, DepositSerializer, AdminDepositSerializer
+from apps.billing.models import Balance
+from apps.billing.serializers import BalanceSerializer, DepositSerializer, AdminDepositSerializer
 
 
 User = get_user_model()

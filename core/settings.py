@@ -50,9 +50,11 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
 
-    'api',
-    'chat_ads',
-    'common',
+    'apps.api',
+    'apps.chat_ads',
+    'apps.common',
+    'apps.account',
+    'apps.billing',
 ]
 
 MIDDLEWARE = [
@@ -100,7 +102,7 @@ DATABASES = {
     }
 }
 # Custom User Model
-AUTH_USER_MODEL = 'api.CustomUser'
+AUTH_USER_MODEL = 'account.CustomUser'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -125,6 +127,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://185.203.241.191",
     "http://localhost:8000",
     "http://localhost",
+    "https://nonmutational-hipolito-unravaged.ngrok-free.dev"
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True

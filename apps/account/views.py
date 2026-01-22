@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenVerifyView
 from django.contrib.auth import get_user_model
 
-from api.serializer.auth_serializer import UserRegistrationSerializer, UserLoginSerializer, UserProfileSerializer
+from apps.account.serializers import UserRegistrationSerializer, UserLoginSerializer, UserProfileSerializer
 
 
 

@@ -1,75 +1,9 @@
-import uuid
 from decimal import Decimal
 
-from django.core.validators import MinValueValidator
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.conf import settings
+from django.core.validators import MinValueValidator
 
-
-class CustomUser(AbstractUser):
-    """Кастомная модель пользователя с UUID"""
-    user_id = models.UUIDField(verbose_name='User ID', default=uuid.uuid4, editable=False, unique=True)
-    is_admin = models.BooleanField(default=False)
-
-    class Meta:
-        verbose_name = 'User'
-        verbose_name_plural = 'Users'
-
-    def __str__(self):
-        return f"{self.username} ({self.user_id})"
-
-
-class Balance(models.Model):
-    """Модель баланса пользователя"""
-    user = models.OneToOneField(
-        CustomUser,
-        on_delete=models.CASCADE,
-        related_name='balance',
-        verbose_name='User'
-    )
-    amount = models.DecimalField(
-        verbose_name='Сумма баланса',
-        max_digits=15,
-        decimal_places=2,
-        default=0.00,
-        validators=[MinValueValidator(Decimal('0.00'))]
-    )
-    add_amount = models.DecimalField(
-        verbose_name='Пополнить',
-        max_digits=15,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        default=0.00,
-        validators=[MinValueValidator(Decimal('0.00'))],
-        help_text='Сумма будет ДОБАВЛЕНА к балансу'
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = 'Balance'
-        verbose_name_plural = 'Balances'
-
-    def __str__(self):
-        return f"{self.user.username}: {self.amount}"
-
-    def deposit(self, amount):
-        """Пополнение баланса"""
-        self.amount += Decimal(amount)
-        self.save()
-
-    def withdraw(self, amount):
-        """Списание с баланса (с проверкой)"""
-        if self.amount >= amount:
-            self.amount -= amount
-            self.save()
-            return True
-        return False
-
-    def get_available_amount(self):
-        """Получение доступного баланса"""
-        return self.amount
 
 
 class Tag(models.Model):
@@ -97,7 +31,7 @@ class Tag(models.Model):
 class Channel(models.Model):
     """Модель канала"""
     channel_id = models.CharField(max_length=255, unique=True)
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='channels')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='channels')
     channel_name = models.CharField(max_length=255, unique=True)
     tags = models.ManyToManyField(Tag, related_name='channels', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -119,7 +53,7 @@ class Channel(models.Model):
 class Order(models.Model):
     """Модель рекламы"""
     channel_id = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name='orders')
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='orders', verbose_name='User')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='orders', verbose_name='User')
     channel_name = models.CharField(verbose_name='Channel Name', max_length=255)
     order_name = models.CharField(verbose_name='Order Name', max_length=255)
     tags = models.ManyToManyField(Tag, related_name='orders', blank=True, verbose_name='Tags')
@@ -218,7 +152,7 @@ class Order(models.Model):
 
     def cancel_order(self):
         """Отменяет заказ и возвращает средства за оставшиеся показы"""
-        if not self.cancelled and self.is_active:
+        if not self.cancelled:
             self.cancelled = True
             self.is_active = False
             self.completed = False

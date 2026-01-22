@@ -2,7 +2,7 @@ from decimal import Decimal
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
-from api.models import Balance
+from apps.billing.models import Balance
 
 User = get_user_model()
 

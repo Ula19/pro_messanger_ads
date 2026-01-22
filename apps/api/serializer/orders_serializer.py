@@ -1,8 +1,8 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from api.models import Channel, Order, Tag, Balance
-
+from apps.api.models import Channel, Order, Tag
+from apps.billing.models import Balance
 
 
 class TagSerializer(serializers.ModelSerializer):

@@ -3,9 +3,9 @@ from rest_framework.response import Response
 from django.db import transaction
 from rest_framework.views import APIView
 
-from api.models import Order, Tag, AdView
+from apps.api.models import Order, Tag, AdView
 
-from api.serializer.search_serializer import SearchRequestSerializer, SearchResultSerializer, ClickOrderSerializer
+from apps.api.serializer.search_serializer import SearchRequestSerializer, SearchResultSerializer, ClickOrderSerializer
 
 
 
