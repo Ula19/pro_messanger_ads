@@ -66,10 +66,9 @@ class ChatAdOrderCreateView(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         """
-        Переопределяем для возврата 204 вместо стандартного 201 с данными
+        Переопределяем для возврата 201 вместо стандартного 201 с данными
         """
         response = super().create(request, *args, **kwargs)
-        # Заменяем 201 на 204 и убираем контент
         return Response({
             'message': 'Канал и заказ успешно созданы',
         }, status=status.HTTP_201_CREATED)
