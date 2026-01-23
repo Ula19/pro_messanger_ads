@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.db import transaction
@@ -14,6 +15,7 @@ class SearchChannelsView(generics.GenericAPIView):
     serializer_class = SearchRequestSerializer
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(request=SearchRequestSerializer, responses=SearchResultSerializer)
     def post(self, request):
         # 1. Валидация входных данных с помощью SearchRequestSerializer
         request_serializer = SearchRequestSerializer(data=request.data)
@@ -125,6 +127,7 @@ class ClickView(APIView):
     serializer_class = ClickOrderSerializer
     permission_classes = [permissions.AllowAny]
 
+    @extend_schema(responses={204: None})
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
 

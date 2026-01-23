@@ -9,7 +9,8 @@ from apps.common.pagination import StandardResultsSetPagination
 
 from apps.billing.models import Balance
 from .models import ChatAdOrder, ChatAdMedia
-from .serializers import ChatAdMediaSerializer, ChatAdOrderSerializer
+from .serializers import ChatAdMediaSerializer, ChatAdOrderSerializer, OrderActivationSerializer, ResponsesMessageSerializer
+
 
 
 class ChatAdMediaUploadView(generics.CreateAPIView):
@@ -26,18 +27,11 @@ class ChatAdMediaUploadView(generics.CreateAPIView):
         serializer.save(user=self.request.user)
 
 
-@extend_schema(responses={
-    201: {
-        "type": "object",
-        "properties": {
-            "message": {"type": "string"},
-        }
-    }
-})
+@extend_schema(request=ChatAdOrderSerializer, responses=ResponsesMessageSerializer)
 class ChatAdOrderCreateView(generics.CreateAPIView):
     """
     Создание заказа и оплата.
-    В поле media_id принимаем UUID полученный на прошлом шаге.
+    В поле media_id принимаем UUID медиафайла
     """
     serializer_class = ChatAdOrderSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -69,9 +63,12 @@ class ChatAdOrderCreateView(generics.CreateAPIView):
         Переопределяем для возврата 201 вместо стандартного 201 с данными
         """
         response = super().create(request, *args, **kwargs)
-        return Response({
-            'message': 'Канал и заказ успешно созданы',
-        }, status=status.HTTP_201_CREATED)
+
+        response_data = {'message': 'Канал и заказ успешно созданы'}
+        response_serializer = ResponsesMessageSerializer(data=response_data)
+        response_serializer.is_valid(raise_exception=True)
+
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
 
 class ChatAdOrderListView(generics.ListAPIView):
@@ -154,3 +151,29 @@ class ChatAdCancelOrderView(generics.GenericAPIView):
         if order.completed:
             return 'Нельзя отменить завершенный заказ.'
         return None
+
+
+class OrderActivationView(generics.GenericAPIView):
+    """
+    Активация/деактивация заказа по ID
+    Получает order_id и is_active в теле POST запроса
+    """
+    serializer_class = OrderActivationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(request=OrderActivationSerializer, responses=ResponsesMessageSerializer)
+    def post(self, request, *args, **kwargs):
+        # Передаем request в контекст, чтобы сериализатор видел request.user
+        serializer = self.get_serializer(data=request.data)
+
+        # Запуск валидации (если ошибка, вернет 400 Bad Request)
+        serializer.is_valid(raise_exception=True)
+
+        # Запуск сохранения (транзакции)
+        updated_order = serializer.save()
+
+        response_data = {'message': f'Статус заказа успешно обновлен.'}
+
+        response_serializer = ResponsesMessageSerializer(data=response_data)
+        response_serializer.is_valid(raise_exception=True)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)

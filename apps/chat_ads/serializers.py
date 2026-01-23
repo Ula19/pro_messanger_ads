@@ -1,6 +1,7 @@
 # chat_ads/serializers.py
 from decimal import Decimal
 
+from django.db import transaction
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import ChatAdOrder, ChatAdView, ChatAdMedia
@@ -132,3 +133,82 @@ class ChatAdViewSerializer(serializers.ModelSerializer):
         model = ChatAdView
         fields = ['id', 'order', 'viewer_id', 'view_count', 'clicked', 'last_viewed_at']
         read_only_fields = ['id', 'view_count', 'clicked', 'last_viewed_at']
+
+
+class OrderActivationSerializer(serializers.Serializer):
+    order_id = serializers.UUIDField(required=True)
+    is_active = serializers.BooleanField(required=True)
+
+    def validate_order_id(self, value):
+        """
+        1. Проверяем, существует ли заказ.
+        2. Проверяем, принадлежит ли он текущему юзеру.
+        Возвращаем САМ ОБЪЕКТ, чтобы не искать его снова.
+        """
+        user = self.context['request'].user
+        try:
+            # Сразу ищем по ID и юзеру. Если юзер чужой — выпадет DoesNotExist
+            order = ChatAdOrder.objects.get(pk=value, user=user)
+        except ChatAdOrder.DoesNotExist:
+            raise serializers.ValidationError("Заказ не найден или у вас нет прав на его изменение.")
+        return order
+
+    def validate(self, attrs):
+        """
+        Предварительная валидация бизнес-логики.
+        """
+        order = attrs['order_id']  # Здесь уже объект модели (спасибо методу выше)
+        new_is_active = attrs['is_active']
+
+        # 1. Если заказ отменен или завершен — менять статус нельзя
+        if order.cancelled:
+            raise serializers.ValidationError("Невозможно активировать отмененный заказ.")
+
+        if order.completed:
+            raise serializers.ValidationError("Невозможно активировать завершенный заказ.")
+
+        # 2. Если пытаемся ВКЛЮЧИТЬ, проверяем ресурсы
+        if new_is_active:
+            if order.remaining_views <= 0:
+                raise serializers.ValidationError("Нельзя активировать заказ: закончились просмотры.")
+
+            if order.budget <= 0:
+                raise serializers.ValidationError("Нельзя активировать заказ с нулевым бюджетом.")
+
+        return attrs
+
+    def save(self):
+        """
+        Метод сохранения с блокировкой базы данных.
+        """
+        order_instance = self.validated_data['order_id']
+        new_is_active = self.validated_data['is_active']
+
+        # Если статус не меняется, просто выходим
+        if order_instance.is_active == new_is_active:
+            return order_instance
+
+        # АТОМАРНАЯ ОПЕРАЦИЯ (Защита от двойных списаний/активаций)
+        with transaction.atomic():
+            # Блокируем строку в БД (select_for_update)
+            # Нужно перезапросить объект по ID, чтобы наложить блокировку
+            locked_order = ChatAdOrder.objects.select_for_update().get(pk=order_instance.pk)
+
+            # Повторная проверка внутри транзакции (на случай параллельных запросов)
+            if new_is_active and locked_order.remaining_views <= 0:
+                raise serializers.ValidationError("Ошибка активации: просмотры исчерпаны.")
+
+            # Применяем изменения
+            locked_order.is_active = new_is_active
+
+            # Если вдруг активировали, но просмотров 0 (параноидальная проверка)
+            if new_is_active and locked_order.remaining_views <= 0:
+                locked_order.completed = True
+                locked_order.is_active = False
+
+            locked_order.save(update_fields=['is_active', 'completed'])
+            return locked_order
+
+
+class ResponsesMessageSerializer(serializers.Serializer):
+    message = serializers.CharField()

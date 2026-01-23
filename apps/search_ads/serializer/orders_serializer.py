@@ -282,6 +282,11 @@ class OrderActivationSerializer(serializers.Serializer):
         return errors
 
 
+class ResponsesMessageSerializer(serializers.Serializer):
+    message = serializers.CharField()
+
+
+
 # НУЖНО ПЕРЕДЕЛАТЬ ОТВЕТЬ КОТОРЫЙ БУДЕТ ВОЗВРАЩЕНЬ В СЛУЧАЕ УСПЕХА
 class ChannelOrderSerializer(serializers.Serializer):
     """Сериализатор для создания канала и заказа"""

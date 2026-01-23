@@ -7,22 +7,17 @@ from django.db import transaction
 from apps.common.pagination import StandardResultsSetPagination
 
 from apps.search_ads.models import Order
-from apps.search_ads.serializer.orders_serializer import OrderDetailSerializer, ChannelOrderSerializer, OrderActivationSerializer
+from apps.search_ads.serializer.orders_serializer import (OrderDetailSerializer, ChannelOrderSerializer,
+                                                          OrderActivationSerializer, ResponsesMessageSerializer)
 
 
-@extend_schema(responses={
-    201: {
-        "type": "object",
-        "properties": {
-            "message": {"type": "string"},
-        }
-    }
-})
+
 class CreateChannelOrderView(generics.CreateAPIView):
     """Создание канала и заказа в одном запросе"""
     serializer_class = ChannelOrderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=ChannelOrderSerializer, responses=ResponsesMessageSerializer)
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -31,9 +26,11 @@ class CreateChannelOrderView(generics.CreateAPIView):
         serializer.context['request'] = request
         result = serializer.save()
 
-        return Response({
-            'message': 'Канал и заказ успешно созданы',
-        }, status=status.HTTP_201_CREATED)
+        response_data = {'message': 'Канал и заказ успешно созданы'}
+        response_serializer = ResponsesMessageSerializer(data=response_data)
+        response_serializer.is_valid(raise_exception=True)
+
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
 
 class CancelOrderView(generics.GenericAPIView):
@@ -142,6 +139,7 @@ class OrderActivationView(generics.GenericAPIView):
     serializer_class = OrderActivationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(request=OrderActivationSerializer, responses=ResponsesMessageSerializer)
     def post(self, request):
         """
         Обработка POST запроса для активации/деактивации заказа
@@ -192,21 +190,11 @@ class OrderActivationView(generics.GenericAPIView):
 
             locked_order.save()
 
-        # Формируем ответ
-        response_data = {
-            'message': f'Статус заказа успешно изменен с {old_status} на {is_active}',
-            'order': {
-                'id': order.id,
-                'channel_name': order.channel_name,
-                'order_name': order.order_name,
-                'is_active': (not order.is_active),
-                'remaining_views': order.remaining_views,
-                'completed': order.completed,
-                'cancelled': order.cancelled,
-            }
-        }
+        response_data = {'message': f'Статус заказа успешно изменен с "{old_status}" на "{is_active}"'}
+        response_serializer = ResponsesMessageSerializer(data=response_data)
+        response_serializer.is_valid(raise_exception=True)
 
-        return Response(response_data, status=status.HTTP_200_OK)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
 
 class ActiveOrderListView(generics.ListAPIView):
