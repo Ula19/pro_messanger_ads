@@ -35,10 +35,9 @@ class CreateChannelOrderView(generics.CreateAPIView):
 
 class CancelOrderView(generics.GenericAPIView):
     """Отмена заказа по ID в URL"""
-    # serializer_class = CancelOrderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    @extend_schema(responses={204: None})
+    @extend_schema(request=None, responses={204: None})
     def post(self, request, order_id):
         """
         Отменяет заказ пользователя.

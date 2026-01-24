@@ -35,6 +35,11 @@ class ChatAdMedia(models.Model):
     # Флаг, привязан ли файл к заказу (чтобы потом удалять мусор)
     is_linked = models.BooleanField(default=False)
 
+    class Meta:
+        verbose_name = 'Медиа рекламы'
+        verbose_name_plural = 'Медиа рекламы'
+        ordering = ['-created_at']
+
     def __str__(self):
         return f"{self.media_type} by {self.user.username} ({self.id})"
 

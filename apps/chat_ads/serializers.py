@@ -51,7 +51,7 @@ class ChatAdOrderSerializer(serializers.ModelSerializer):
         fields = [
             'order_id', 'user_id', 'order_name', 'text', 'link', 'channels',
             'media_url', 'spm', 'budget',  'total_views', 'clicks',
-            'max_views_per_user', 'shown_views', 'remaining_views', 'max_views_per_user',
+            'max_views_per_user', 'shown_views', 'remaining_views',
             'refund_amount', 'completed', 'cancelled', 'is_active', 'created_at',
             'media_id'
         ]
@@ -73,6 +73,7 @@ class ChatAdOrderSerializer(serializers.ModelSerializer):
         """
         return obj.get_refund_amount()
 
+    @extend_schema_field(serializers.URLField(allow_null=True))
     def get_media_url(self, obj):
         """Возвращает URL прикрепленного медиафайла"""
         if obj.media_url and obj.media_url.file:
@@ -135,7 +136,7 @@ class ChatAdViewSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'view_count', 'clicked', 'last_viewed_at']
 
 
-class OrderActivationSerializer(serializers.Serializer):
+class ChatAdOrderActivationSerializer(serializers.Serializer):
     order_id = serializers.UUIDField(required=True)
     is_active = serializers.BooleanField(required=True)
 
@@ -210,5 +211,44 @@ class OrderActivationSerializer(serializers.Serializer):
             return locked_order
 
 
-class ResponsesMessageSerializer(serializers.Serializer):
+class ChatAdResponsesMessageSerializer(serializers.Serializer):
     message = serializers.CharField()
+
+
+class AdRequestSerializer(serializers.Serializer):
+    """Валидация входящего запроса на получение рекламы"""
+    channel_name = serializers.CharField(max_length=255, required=True)
+    viewer_id = serializers.CharField(max_length=255, required=True)
+
+
+class ChatAdPublicSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для отдачи рекламы клиенту.
+    Превращает сложный объект Media в простую ссылку.
+    """
+    media_url = serializers.SerializerMethodField()
+    media_type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChatAdOrder
+        fields = [
+            'order_id', 'order_name', 'text', 'link',
+            'media_url', 'media_type', 'total_views',
+            'clicks', 'shown_views', 'remaining_views'
+        ]
+        read_only_fields = [
+            'clicks', 'shown_views', 'remaining_views', 'total_views',
+        ]
+
+    @extend_schema_field(serializers.URLField(allow_null=True))
+    def get_media_url(self, obj):
+        # Если есть привязанный медиа-файл, возвращаем его полный URL
+        if obj.media_url and obj.media_url.file:
+            return obj.media_url.file.url
+        return None
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_media_type(self, obj):
+        if obj.media_url:
+            return obj.media_url.media_type
+        return None
