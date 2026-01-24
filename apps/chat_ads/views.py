@@ -65,7 +65,7 @@ class ChatAdOrderCreateView(generics.CreateAPIView):
         """
         response = super().create(request, *args, **kwargs)
 
-        response_data = {'message': 'Канал и заказ успешно созданы'}
+        response_data = {'message': 'Ордер успешна создан'}
         response_serializer = ChatAdResponsesMessageSerializer(data=response_data)
         response_serializer.is_valid(raise_exception=True)
 
@@ -118,7 +118,7 @@ class ChatAdCancelOrderView(generics.GenericAPIView):
     """Отмена заказа по ID в URL"""
     permission_classes = [permissions.IsAuthenticated]
 
-    @extend_schema(request=None, responses={204: None})
+    @extend_schema(request=None, responses=ChatAdResponsesMessageSerializer)
     def post(self, request, order_id):
         """
         Отменяет заказ пользователя.
@@ -137,7 +137,13 @@ class ChatAdCancelOrderView(generics.GenericAPIView):
 
                 refund_amount = order.cancel_order()
 
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            response_data = {'message': 'Ордер отменен'}
+            response_serializer = ChatAdResponsesMessageSerializer(data=response_data)
+            response_serializer.is_valid(raise_exception=True)
+
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+            # return Response(status=status.HTTP_204_NO_CONTENT)
 
         except ChatAdOrder.DoesNotExist:
             return Response(

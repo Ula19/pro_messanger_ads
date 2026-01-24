@@ -5,6 +5,7 @@ from django.db import transaction
 from rest_framework.views import APIView
 
 from apps.search_ads.models import Order, Tag, AdView
+from apps.search_ads.serializer.orders_serializer import ResponsesMessageSerializer
 
 from apps.search_ads.serializer.search_serializer import SearchRequestSerializer, SearchResultSerializer, ClickOrderSerializer
 
@@ -127,7 +128,7 @@ class ClickView(APIView):
     serializer_class = ClickOrderSerializer
     permission_classes = [permissions.AllowAny]
 
-    @extend_schema(responses={204: None})
+    @extend_schema(request=ClickOrderSerializer, responses=ResponsesMessageSerializer)
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
 
@@ -142,9 +143,16 @@ class ClickView(APIView):
         try:
             order = Order.objects.get(id=order_id)
             order.increment_clicks()
-            return Response(
-                status=status.HTTP_204_NO_CONTENT
-            )
+
+            response_data = {'message': 'Пользователь перешел по рекламе. (Кликнул по рекламе)'}
+            response_serializer = ResponsesMessageSerializer(data=response_data)
+            response_serializer.is_valid(raise_exception=True)
+
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+            # return Response(
+            #     status=status.HTTP_204_NO_CONTENT
+            # )
         except Order.DoesNotExist:
             return Response(
                 {'error': 'Ордер не найден'},

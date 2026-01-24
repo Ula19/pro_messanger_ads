@@ -37,7 +37,7 @@ class CancelOrderView(generics.GenericAPIView):
     """Отмена заказа по ID в URL"""
     permission_classes = [permissions.IsAuthenticated]
 
-    @extend_schema(request=None, responses={204: None})
+    @extend_schema(request=None, responses=ResponsesMessageSerializer)
     def post(self, request, order_id):
         """
         Отменяет заказ пользователя.
@@ -56,7 +56,13 @@ class CancelOrderView(generics.GenericAPIView):
 
                 refund_amount = order.cancel_order()
 
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            response_data = {'message': 'Ордер отменен'}
+            response_serializer = ResponsesMessageSerializer(data=response_data)
+            response_serializer.is_valid(raise_exception=True)
+
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+            # return Response(status=status.HTTP_204_NO_CONTENT)
 
         except Order.DoesNotExist:
             return Response(
