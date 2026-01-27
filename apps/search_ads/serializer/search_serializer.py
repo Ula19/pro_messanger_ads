@@ -26,10 +26,19 @@ class SearchRequestSerializer(serializers.Serializer):
 
 class ClickOrderSerializer(serializers.Serializer):
     order_id = serializers.IntegerField(required=True)
-    user_id = serializers.CharField(required=True, help_text='ID пользователя который посмотрел канал')
+    viewer_id = serializers.CharField(required=True, help_text='ID пользователя который посмотрел канал')
 
-    def validate_order_id(self, value):
-        # Проверяем, что ордер существует
-        if not Order.objects.filter(id=value).exists():
-            raise serializers.ValidationError("Ордер не найден")
-        return value
+    def validate(self, attrs):
+        order_id = attrs.get('order_id')
+
+        try:
+            order = Order.objects.only('id', 'clicks', 'is_active').get(
+                id=order_id,
+                is_active=True
+            )
+        except Order.DoesNotExist:
+            raise serializers.ValidationError({"order_id": "Активный ордер не найден"})
+
+        # Кладем найденный объект в данные, чтобы view могла его забрать
+        attrs['order_object'] = order
+        return attrs

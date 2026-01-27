@@ -164,6 +164,15 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/minute',  # ограничения для анонимных пользователей
+        'user': '100/minute',  # ограничения для авторизованных пользователей
+    }
 }
 
 # JWT Settings
@@ -183,12 +192,6 @@ SPECTACULAR_SETTINGS = {
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,  # не сбрасывать авторизацию
     },
-
-    # # Автоматическое определение типов для SerializerMethodField
-    # 'POSTPROCESSING_HOOKS': [
-    #     'drf_spectacular.hooks.postprocess_schema_enums',
-    #     'drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields',
-    # ],
 }
 
 

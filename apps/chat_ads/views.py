@@ -1,3 +1,5 @@
+from django.db.models import F
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status, permissions
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -11,7 +13,7 @@ from apps.common.pagination import StandardResultsSetPagination
 from apps.billing.models import Balance
 from .models import ChatAdOrder, ChatAdMedia, ChatAdView
 from .serializers import ChatAdMediaSerializer, ChatAdOrderSerializer, ChatAdOrderActivationSerializer, \
-    ChatAdResponsesMessageSerializer, AdRequestSerializer, ChatAdPublicSerializer
+    ChatAdResponsesMessageSerializer, AdRequestSerializer, ChatAdPublicSerializer, ChatAdClickOrderSerializer
 
 
 class ChatAdMediaUploadView(generics.CreateAPIView):
@@ -273,3 +275,33 @@ class GetChatAdView(APIView):
             {"message": "Нет доступной рекламы для этого канала или пользователя"},
             status=status.HTTP_404_NOT_FOUND
         )
+
+
+class ChatAdClickView(APIView):
+    """
+    Увеличивает счетчик кликов у объявления.
+    """
+    permission_classes = [permissions.AllowAny]  # Кликать может любой
+    serializer_class = ChatAdClickOrderSerializer
+
+    @extend_schema(request=ChatAdClickOrderSerializer, responses=ChatAdResponsesMessageSerializer)
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # 1. Забираем уже найденный объект из сериализатора
+        order = serializer.validated_data['order_object']
+
+        # 2. Атомарное обновление (защита от гонки данных)
+        # Мы НЕ пишем order.clicks += 1, мы даем инструкцию базе данных
+        order.clicks = F('clicks') + 1
+
+        # 3. Сохраняем ТОЛЬКО поле clicks, не трогая остальные
+        order.updated_at = timezone.now()
+        order.save(update_fields=['clicks', 'updated_at'])
+
+        response_data = {'message': 'Пользователь перешел по рекламе. (Кликнул по рекламе)'}
+        response_serializer = ChatAdResponsesMessageSerializer(data=response_data)
+        response_serializer.is_valid(raise_exception=True)
+
+        return Response(response_serializer.data, status=status.HTTP_200_OK)

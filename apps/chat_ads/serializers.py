@@ -158,7 +158,7 @@ class ChatAdOrderActivationSerializer(serializers.Serializer):
         """
         Предварительная валидация бизнес-логики.
         """
-        order = attrs['order_id']  # Здесь уже объект модели (спасибо методу выше)
+        order = attrs['order_id']  # Здесь уже объект модели
         new_is_active = attrs['is_active']
 
         # 1. Если заказ отменен или завершен — менять статус нельзя
@@ -186,8 +186,12 @@ class ChatAdOrderActivationSerializer(serializers.Serializer):
         new_is_active = self.validated_data['is_active']
 
         # Если статус не меняется, просто выходим
+        # if order_instance.is_active == new_is_active:
+        #     return order_instance
+
         if order_instance.is_active == new_is_active:
-            return order_instance
+            status_text = "активен" if new_is_active else "неактивен"
+            raise serializers.ValidationError(f"Заказ уже {status_text}")
 
         # АТОМАРНАЯ ОПЕРАЦИЯ (Защита от двойных списаний/активаций)
         with transaction.atomic():
@@ -252,3 +256,23 @@ class ChatAdPublicSerializer(serializers.ModelSerializer):
         if obj.media_url:
             return obj.media_url.media_type
         return None
+
+
+class ChatAdClickOrderSerializer(serializers.Serializer):
+    order_id = serializers.UUIDField(required=True)
+    viewer_id = serializers.CharField(required=True, help_text='ID пользователя который посмотрел канал')
+
+    def validate(self, attrs):
+        order_id = attrs.get('order_id')
+
+        try:
+            order = ChatAdOrder.objects.only('order_id', 'clicks', 'is_active').get(
+                order_id=order_id,
+                is_active=True
+            )
+        except ChatAdOrder.DoesNotExist:
+            raise serializers.ValidationError({"order_id": "Активный ордер не найден"})
+
+        # Кладем найденный объект в данные, чтобы view могла его забрать
+        attrs['order_object'] = order
+        return attrs

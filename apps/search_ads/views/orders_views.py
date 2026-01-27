@@ -95,7 +95,7 @@ class OrderListView(generics.ListAPIView):
 class OrderDetailView(generics.RetrieveAPIView):
     """
     Получение детальной информации о заказе.
-    GET /api/orders/{order_id}/
+    GET /api/orders/{order_id}/detail/
     """
     serializer_class = OrderDetailSerializer
     permission_classes = [permissions.IsAuthenticated]

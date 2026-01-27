@@ -1,3 +1,5 @@
+from django.db.models import F
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -125,36 +127,30 @@ class SearchChannelsView(generics.GenericAPIView):
 
 
 class ClickView(APIView):
+    """
+    Увеличивает счетчик кликов у объявления.
+    """
+    permission_classes = [permissions.AllowAny]  # Кликать может любой
     serializer_class = ClickOrderSerializer
-    permission_classes = [permissions.AllowAny]
 
     @extend_schema(request=ClickOrderSerializer, responses=ResponsesMessageSerializer)
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        if not serializer.is_valid():
-            return Response(
-                serializer.errors,
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # 1. Забираем уже найденный объект из сериализатора
+        order = serializer.validated_data['order_object']
 
-        order_id = serializer.validated_data['order_id']
+        # 2. Атомарное обновление (защита от гонки данных)
+        # Мы НЕ пишем order.clicks += 1, мы даем инструкцию базе данных
+        order.clicks = F('clicks') + 1
 
-        try:
-            order = Order.objects.get(id=order_id)
-            order.increment_clicks()
+        # 3. Сохраняем ТОЛЬКО поле clicks, не трогая остальные
+        order.updated_at = timezone.now()
+        order.save(update_fields=['clicks', 'updated_at'])
 
-            response_data = {'message': 'Пользователь перешел по рекламе. (Кликнул по рекламе)'}
-            response_serializer = ResponsesMessageSerializer(data=response_data)
-            response_serializer.is_valid(raise_exception=True)
+        response_data = {'message': 'Пользователь перешел по рекламе. (Кликнул по рекламе)'}
+        response_serializer = ResponsesMessageSerializer(data=response_data)
+        response_serializer.is_valid(raise_exception=True)
 
-            return Response(response_serializer.data, status=status.HTTP_200_OK)
-
-            # return Response(
-            #     status=status.HTTP_204_NO_CONTENT
-            # )
-        except Order.DoesNotExist:
-            return Response(
-                {'error': 'Ордер не найден'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
