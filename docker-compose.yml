@@ -13,6 +13,16 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck: # Проверка готовности базы
+      test: [ "CMD-SHELL", "pg_isready -U channel_user_2 -d channel_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    container_name: channel_redis
+    restart: unless-stopped
 
   web:
     build: .
@@ -42,10 +52,59 @@ services:
       - DATABASES_PORT=5432
 #      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
       - ALLOWED_HOSTS=localhost,127.0.0.1,185.203.241.191,nonmutational-hipolito-unravaged.ngrok-free.dev
+      # Настройки для Celery внутри Docker (хост - имя сервиса 'redis')
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     ports:
       - 9000:9000
     depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  celery_worker:
+    build: .
+    container_name: channel_worker
+    command: celery -A core worker -l info
+    volumes:
+      - media_volume:/app/media # ОБЯЗАТЕЛЬНО: воркер должен видеть файлы, чтобы удалить их
+    env_file:
+      - .env
+    environment:
+      - DEBUG=False
+      - DATABASES_NAME=channel_db
+      - DATABASES_USER=channel_user_2
+      - DATABASES_PASSWORD=channel_pass123
+      - DATABASES_HOST=db
+      - DATABASES_PORT=5432
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
       - db
+      - redis
+      - web # Чтобы миграции точно прошли до запуска воркера
+    restart: unless-stopped
+
+  celery_beat:
+    build: .
+    container_name: channel_beat
+    command: celery -A core beat -l info
+    env_file:
+      - .env
+    environment:
+      - DEBUG=False
+      - DATABASES_NAME=channel_db
+      - DATABASES_USER=channel_user_2
+      - DATABASES_PASSWORD=channel_pass123
+      - DATABASES_HOST=db
+      - DATABASES_PORT=5432
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
     restart: unless-stopped
 
   nginx:
