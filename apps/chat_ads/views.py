@@ -236,6 +236,9 @@ class GetChatAdView(APIView):
                     # Юзер уже насмотрел лимит -> пропускаем этот заказ, идем к следующему (дешевле)
                     continue
 
+                if order.max_views_per_user == 0:
+                    continue
+
             # 3.3 Попытка списания просмотра (Concurrency safe)
             # Если мы дошли сюда, значит реклама подходит. Нужно заблокировать строку и списать просмотр.
             with transaction.atomic():

@@ -204,8 +204,6 @@ class OrderActivationView(generics.GenericAPIView):
 
 class ActiveOrderListView(generics.ListAPIView):
     """Получение активных заказов текущего пользователя"""
-    # serializer_class = OrderListSerializer # Пусть пока постоит. Сейчас OrderListSerializer делает тоже самое
-    # что и OrderDetailSerializer
     serializer_class = OrderDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardResultsSetPagination

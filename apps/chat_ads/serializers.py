@@ -126,6 +126,8 @@ class ChatAdOrderSerializer(serializers.ModelSerializer):
         """Валидация лимита показов"""
         if value < -1:
             raise serializers.ValidationError("Значение не может быть меньше -1")
+        if value == 0:
+            raise serializers.ValidationError("Значение не может быть 0")
         return value
 
 

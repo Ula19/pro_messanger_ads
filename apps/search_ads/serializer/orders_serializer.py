@@ -116,46 +116,6 @@ class OrderSerializer(serializers.ModelSerializer):
         return instance
 
 
-class OrderListSerializer(serializers.ModelSerializer):
-    """Сериализатор для списка заказов"""
-    channel_id = serializers.SerializerMethodField()
-    tags = serializers.SerializerMethodField()
-    # channel_tags = serializers.SerializerMethodField()
-    refund_amount = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Order
-        fields = [
-            'id', 'channel_id', 'channel_name', 'order_name',
-            'tags', 'spm', 'budget',
-            'total_views', 'shown_views', 'remaining_views', 'clicks',
-            'completed', 'cancelled', 'is_active', 'refund_amount',
-            'max_views_per_user',
-            'created_at', 'updated_at'
-        ]
-
-    def get_channel_id(self, obj):
-        return str(obj.channel_id.channel_id)
-
-    def get_user_views_count(self, obj):
-        """Получаем количество пользователей, которые просмотрели рекламу"""
-        return obj.ad_views.count()
-
-    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
-    def get_tags(self, obj):
-        """Получаем только имена тегов заказа"""
-        return [tag.name for tag in obj.tags.all()]
-
-    # def get_channel_tags(self, obj):
-    #     """Получаем только имена тегов канала"""
-    #     return [tag.name for tag in obj.channel_id.tags.all()]
-
-    @extend_schema_field(serializers.DecimalField(max_digits=15, decimal_places=2))
-    def get_refund_amount(self, obj):
-        """Получаем сумму возврата при отмене"""
-        return obj.get_refund_amount()
-
-
 class OrderDetailSerializer(serializers.ModelSerializer):
     """
     Сериализатор для детальной информации о заказе
@@ -286,8 +246,6 @@ class ResponsesMessageSerializer(serializers.Serializer):
     message = serializers.CharField()
 
 
-
-# НУЖНО ПЕРЕДЕЛАТЬ ОТВЕТЬ КОТОРЫЙ БУДЕТ ВОЗВРАЩЕНЬ В СЛУЧАЕ УСПЕХА
 class ChannelOrderSerializer(serializers.Serializer):
     """Сериализатор для создания канала и заказа"""
     # Поля канала
@@ -308,6 +266,9 @@ class ChannelOrderSerializer(serializers.Serializer):
 
         if data['budget'] <= 0:
             raise serializers.ValidationError({"budget": "Бюджет должен быть больше 0."})
+
+        if data['max_views_per_user'] <= 0:
+            raise serializers.ValidationError({"max_views_per_user": "max_views_per_user должен быть больше 0."})
 
         return data
 
@@ -362,13 +323,3 @@ class ChannelOrderSerializer(serializers.Serializer):
             'channel': ChannelSerializer(channel).data,
             'order': OrderSerializer(order).data
         }
-
-
-class CancelOrderSerializer(serializers.Serializer):
-    """Сериализатор для отмены заказа"""
-    cancel = serializers.BooleanField(required=True)
-
-    def validate(self, data):
-        if not data.get('cancel'):
-            raise serializers.ValidationError({"cancel": "Для отмены заказа укажите cancel=true"})
-        return data
