@@ -15,7 +15,7 @@ class SearchResultSerializer(serializers.Serializer):
     """Сериализатор для результата поиска"""
     channel_id = serializers.CharField()
     channel_name = serializers.CharField()
-    order_id = serializers.CharField()
+    order_id = serializers.UUIDField()
 
 
 class SearchRequestSerializer(serializers.Serializer):
@@ -25,15 +25,15 @@ class SearchRequestSerializer(serializers.Serializer):
 
 
 class ClickOrderSerializer(serializers.Serializer):
-    order_id = serializers.IntegerField(required=True)
+    order_id = serializers.UUIDField(required=True)
     viewer_id = serializers.CharField(required=True, help_text='ID пользователя который посмотрел канал')
 
     def validate(self, attrs):
         order_id = attrs.get('order_id')
 
         try:
-            order = Order.objects.only('id', 'clicks', 'is_active').get(
-                id=order_id,
+            order = Order.objects.only('order_id', 'clicks', 'is_active').get(
+                order_id=order_id,
                 is_active=True
             )
         except Order.DoesNotExist:

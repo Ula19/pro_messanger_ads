@@ -49,7 +49,7 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'channel_id', 'channel_name', 'order_name', 'tags', 'tag_names',
+            'order_id', 'channel_id', 'channel_name', 'order_name', 'tags', 'tag_names',
             'spm', 'budget', 'total_views', 'shown_views', 'remaining_views', 'clicks',
             'completed', 'cancelled', 'is_active', 'max_views_per_user',
             'created_at', 'updated_at'
@@ -146,7 +146,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'id', 'channel_id', 'channel_name', 'order_name', 'tags',
+            'order_id', 'channel_id', 'channel_name', 'order_name', 'tags',
             'spm', 'budget', 'total_views', 'shown_views', 'remaining_views', 'clicks',
             'completed', 'cancelled', 'is_active', 'refund_amount',
             'max_views_per_user', 'created_at', 'updated_at'
@@ -173,7 +173,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
 
 class OrderActivationSerializer(serializers.Serializer):
     """Сериализатор для активации/деактивации заказа"""
-    order_id = serializers.IntegerField(required=True)
+    order_id = serializers.UUIDField(required=True)
     is_active = serializers.BooleanField(required=True)
 
     def validate(self, data):
@@ -187,7 +187,7 @@ class OrderActivationSerializer(serializers.Serializer):
 
         try:
             # Проверяем, существует ли заказ
-            order = Order.objects.get(id=order_id)
+            order = Order.objects.get(order_id=order_id)
 
             # Проверяем, принадлежит ли заказ текущему пользователю
             if order.user != user:

@@ -43,7 +43,7 @@ class CancelOrderView(generics.GenericAPIView):
         try:
             with transaction.atomic():
                 # select_for_update блокирует строку до конца транзакции
-                order = Order.objects.select_for_update().get(id=order_id, user=request.user)
+                order = Order.objects.select_for_update().get(order_id=order_id, user=request.user)
 
                 if order.cancelled:
                     return Response({'error': 'Заказ уже отменен.'}, status=400)
@@ -99,7 +99,7 @@ class OrderDetailView(generics.RetrieveAPIView):
 
         try:
             order_id = self.kwargs['order_id']
-            obj = queryset.get(id=order_id)
+            obj = queryset.get(order_id=order_id)
             return obj
         except Order.DoesNotExist:
             # Возвращаем 404 с понятным сообщением
@@ -142,7 +142,7 @@ class OrderActivationView(generics.GenericAPIView):
         if 'warning' in serializer.validated_data:
             return Response({
                 'message': serializer.validated_data['warning'],
-                'order_id': order.id,
+                'order_id': order.order_id,
                 'current_status': order.is_active,
                 'requested_status': is_active
             }, status=status.HTTP_200_OK)
@@ -150,7 +150,7 @@ class OrderActivationView(generics.GenericAPIView):
         # Используем атомарную транзакцию для безопасности
         with transaction.atomic():
             # Блокируем заказ для предотвращения race conditions
-            locked_order = Order.objects.select_for_update().get(id=order.id)
+            locked_order = Order.objects.select_for_update().get(order_id=order.order_id)
 
             # Сохраняем старый статус
             old_status = locked_order.is_active

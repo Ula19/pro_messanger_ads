@@ -1,3 +1,4 @@
+import uuid
 from decimal import Decimal
 
 from django.db import models
@@ -52,6 +53,7 @@ class Channel(models.Model):
 
 class Order(models.Model):
     """Модель рекламы"""
+    order_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, primary_key=True)
     channel_id = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name='orders')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='orders', verbose_name='User')
     channel_name = models.CharField(verbose_name='Channel Name', max_length=255)
@@ -113,7 +115,7 @@ class Order(models.Model):
 
     def save(self, *args, **kwargs):
         """При сохранении заказа рассчитываем количество показов"""
-        is_new = self.pk is None
+        is_new = self._state.adding
 
         # Если это новый заказ, рассчитываем количество показов
         if is_new and self.budget and self.spm:

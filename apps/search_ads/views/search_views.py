@@ -76,7 +76,7 @@ class SearchChannelsView(generics.GenericAPIView):
                 return {
                     'channel_id': order.channel_id.channel_id,
                     'channel_name': order.channel_id.channel_name,
-                    'order_id': order.id,
+                    'order_id': order.order_id,
                 }
 
         return None
@@ -86,7 +86,7 @@ class SearchChannelsView(generics.GenericAPIView):
         try:
             with transaction.atomic():
                 # Блокируем заказ для безопасного обновления
-                order_lock = Order.objects.select_for_update().get(pk=order.pk)
+                order_lock = Order.objects.select_for_update().get(order_id=order.order_id)
 
                 # Проверяем, можно ли показывать заказ
                 if (order_lock.remaining_views <= 0 or
