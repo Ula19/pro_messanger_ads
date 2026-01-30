@@ -34,49 +34,31 @@ class CreateChannelOrderView(generics.CreateAPIView):
 
 
 class CancelOrderView(generics.GenericAPIView):
-    """Отмена заказа по ID в URL"""
+    """Отмена заказа по ID"""
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ResponsesMessageSerializer
 
     @extend_schema(request=None, responses=ResponsesMessageSerializer)
     def post(self, request, order_id):
-        """
-        Отменяет заказ пользователя.
-        Получает order_id из параметра пути URL.
-        """
         try:
             with transaction.atomic():
+                # select_for_update блокирует строку до конца транзакции
                 order = Order.objects.select_for_update().get(id=order_id, user=request.user)
 
-                validation_error = self._validate_order_for_cancellation(order)
-                if validation_error:
-                    return Response(
-                        {'error': validation_error},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+                if order.cancelled:
+                    return Response({'error': 'Заказ уже отменен.'}, status=400)
+                if order.completed:
+                    return Response({'error': 'Нельзя отменить завершенный заказ.'}, status=400)
 
-                refund_amount = order.cancel_order()
+                order.cancel_order() # Метод модели
 
-            response_data = {'message': 'Ордер отменен'}
-            response_serializer = ResponsesMessageSerializer(data=response_data)
-            response_serializer.is_valid(raise_exception=True)
-
-            return Response(response_serializer.data, status=status.HTTP_200_OK)
-
-            # return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response({'message': 'Ордер отменен'}, status=status.HTTP_200_OK)
 
         except Order.DoesNotExist:
             return Response(
-                {'error': 'Заказ не найден или у вас нет прав на его отмену.'},
+                {'error': 'Заказ не найден или у вас нет прав.'},
                 status=status.HTTP_404_NOT_FOUND
             )
-
-    def _validate_order_for_cancellation(self, order):
-        """Проверяет, можно ли отменить заказ."""
-        if order.cancelled:
-            return 'Заказ уже отменен.'
-        if order.completed:
-            return 'Нельзя отменить завершенный заказ.'
-        return None
 
 
 class OrderListView(generics.ListAPIView):

@@ -13,7 +13,7 @@ from apps.common.pagination import StandardResultsSetPagination
 from apps.billing.models import Balance
 from .models import ChatAdOrder, ChatAdMedia, ChatAdView
 from .serializers import ChatAdMediaSerializer, ChatAdOrderSerializer, ChatAdOrderActivationSerializer, \
-    ChatAdResponsesMessageSerializer, AdRequestSerializer, ChatAdPublicSerializer, ChatAdClickOrderSerializer
+    ChatAdResponsesMessageSerializer, AdRequestSerializer, ChatAdSearchSerializer, ChatAdClickOrderSerializer
 
 
 class ChatAdMediaUploadView(generics.CreateAPIView):
@@ -197,7 +197,7 @@ class GetChatAdView(APIView):
     serializer_class = AdRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    @extend_schema(request=AdRequestSerializer, responses=ChatAdPublicSerializer)
+    @extend_schema(request=AdRequestSerializer, responses=ChatAdSearchSerializer)
     def post(self, request):
         # 1. Валидация входных данных
         input_serializer = self.serializer_class(data=request.data)
@@ -270,7 +270,7 @@ class GetChatAdView(APIView):
                 # Это экономит место в БД, как и требовалось.
 
                 # 4. Возвращаем рекламу
-                response_serializer = ChatAdPublicSerializer(locked_order)
+                response_serializer = ChatAdSearchSerializer(locked_order)
                 return Response(response_serializer.data, status=status.HTTP_200_OK)
 
         # Если цикл прошел и ничего не вернул

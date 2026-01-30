@@ -227,7 +227,7 @@ class AdRequestSerializer(serializers.Serializer):
     viewer_id = serializers.CharField(max_length=255, required=True)
 
 
-class ChatAdPublicSerializer(serializers.ModelSerializer):
+class ChatAdSearchSerializer(serializers.ModelSerializer):
     """
     Сериализатор для отдачи рекламы клиенту.
     Превращает сложный объект Media в простую ссылку.
