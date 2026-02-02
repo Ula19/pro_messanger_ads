@@ -1,119 +1,85 @@
+from django.db import transaction
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.search_ads.models import Channel, Order, Tag
-from apps.billing.models import Balance
 
 
-class TagSerializer(serializers.ModelSerializer):
-    """Сериализатор для модели Tag"""
-    class Meta:
-        model = Tag
-        fields = ['id', 'name', 'created_at']
 
+class CreateChannelOrderSerializer(serializers.Serializer):
+    """Сериализатор для создания канала и заказа"""
+    # Поля для поиска/создания канала
+    channel_id = serializers.CharField(max_length=255, required=True)
+    channel_name = serializers.CharField(max_length=255, required=True)
+    tags = serializers.ListField(child=serializers.CharField(), required=False, default=list)
 
-class ChannelSerializer(serializers.ModelSerializer):
-    """Сериализатор для модели Channel"""
-    tags = TagSerializer(many=True, read_only=True)
-    tag_names = serializers.ListField(
-        child=serializers.CharField(),
-        write_only=True,
-        required=False,
-        default=list
-    )
-
-    class Meta:
-        model = Channel
-        fields = ['channel_id', 'channel_name', 'tags', 'tag_names', 'created_at', 'updated_at']
-        read_only_fields = ['created_at', 'updated_at', 'channel_id', 'tags']
-
-    def create(self, validated_data):
-        tag_names = validated_data.pop('tag_names', [])
-        channel = Channel.objects.create(**validated_data)
-        if tag_names:
-            channel.add_tags(tag_names)
-        return channel
-
-
-class OrderSerializer(serializers.ModelSerializer):
-    """Сериализатор для модели Order"""
-    channel_id = serializers.SerializerMethodField()
-    tags = TagSerializer(many=True, read_only=True)
-    tag_names = serializers.ListField(
-        child=serializers.CharField(),
-        write_only=True,
-        required=False,
-        default=list
-    )
-
-    class Meta:
-        model = Order
-        fields = [
-            'order_id', 'channel_id', 'channel_name', 'order_name', 'tags', 'tag_names',
-            'spm', 'budget', 'total_views', 'shown_views', 'remaining_views', 'clicks',
-            'completed', 'cancelled', 'is_active', 'max_views_per_user',
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = [
-            'created_at', 'updated_at', 'tags', 'total_views',
-            'shown_views', 'remaining_views', 'completed'
-        ]
-
-    def get_channel_id(self, obj):
-        return str(obj.channel_id.channel_id)
+    # Поля для создания заказа
+    order_name = serializers.CharField(max_length=255, required=True)
+    spm = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
+    budget = serializers.DecimalField(max_digits=15, decimal_places=2, required=True)
+    max_views_per_user = serializers.IntegerField(default=1)
+    is_active = serializers.BooleanField(default=True)
 
     def validate(self, data):
-        # Проверяем, что у пользователя достаточно средств
-        user = self.context['request'].user
-        budget = data.get('budget', 0)
-
-        if budget > 0:
-            try:
-                balance = user.balance
-                if balance.amount < budget:
-                    raise serializers.ValidationError(
-                        {"budget": f"Недостаточно средств. Доступно: {balance.amount}"}
-                    )
-            except Balance.DoesNotExist:
-                raise serializers.ValidationError({"balance": "Баланс не найден"})
-
+        if data['spm'] <= 0:
+            raise serializers.ValidationError({"spm": "SPM должен быть больше 0."})
+        if data['budget'] <= 0:
+            raise serializers.ValidationError({"budget": "Бюджет должен быть больше 0."})
+        if data['max_views_per_user'] <= 0:
+            raise serializers.ValidationError({"max_views_per_user": "Лимит показов должен быть больше 0."})
         return data
 
     def create(self, validated_data):
         user = self.context['request'].user
-        tag_names = validated_data.pop('tag_names', [])
-        budget = validated_data.get('budget', 0)
+        tag_names = validated_data.get('tags', [])
+        budget = validated_data['budget']
 
-        # Списываем средства с баланса
-        if budget > 0:
-            balance = user.balance
+        # 1. Проверяем баланс
+        balance = user.balance
+        if balance.amount < budget:
+            raise serializers.ValidationError(
+                {"budget": f"Недостаточно средств. Доступно: {balance.amount}"}
+            )
+
+        # Используем транзакцию, чтобы все создалось или ничего
+        with transaction.atomic():
+            # 2. Списываем средства
             if not balance.withdraw(budget):
-                raise serializers.ValidationError(
-                    {"budget": f"Недостаточно средств. Доступно: {balance.amount}"}
-                )
+                raise serializers.ValidationError({"budget": "Ошибка списания средств"})
 
-        # Создаем заказ
-        order = Order(**validated_data)
-        order.user = user
+            # 3. Создаем или обновляем канал
+            channel, _ = Channel.objects.update_or_create(
+                channel_id=validated_data['channel_id'],
+                user=user,
+                defaults={'channel_name': validated_data['channel_name']}
+            )
 
-        # Сохраняем теги во временный атрибут
-        order._tag_names = tag_names
-        order.save()
+            # Добавляем теги к каналу
+            if tag_names:
+                channel.add_tags(tag_names)
 
+            # 4. Создаем заказ
+            order = Order.objects.create(
+                channel_id=channel,
+                user=user,
+                channel_name=validated_data['channel_name'],
+                order_name=validated_data['order_name'],
+                spm=validated_data['spm'],
+                budget=validated_data['budget'],
+                is_active=validated_data['is_active'],
+                max_views_per_user=validated_data['max_views_per_user'],
+            )
+
+            # 5. Явно привязываем теги к заказу (безопаснее, чем через _tag_names)
+            if tag_names:
+                for tag_name in tag_names:
+                    # strip() и lower() для чистоты данных
+                    tag, _ = Tag.objects.get_or_create(name=tag_name.strip().lower())
+                    order.tags.add(tag)
+
+        # Возвращаем созданный объект order.
+        # View не использует этот объект для ответа (там ResponseMessage), поэтому это безопасно.
         return order
-
-    def update(self, instance, validated_data):
-        tag_names = validated_data.pop('tag_names', None)
-        instance = super().update(instance, validated_data)
-
-        if tag_names is not None:
-            # Обновляем теги заказа
-            instance.tags.clear()
-            for tag_name in tag_names:
-                tag, _ = Tag.objects.get_or_create(name=tag_name.lower().strip())
-                instance.tags.add(tag)
-
-        return instance
 
 
 class OrderDetailSerializer(serializers.ModelSerializer):
@@ -244,82 +210,3 @@ class OrderActivationSerializer(serializers.Serializer):
 
 class ResponsesMessageSerializer(serializers.Serializer):
     message = serializers.CharField()
-
-
-class ChannelOrderSerializer(serializers.Serializer):
-    """Сериализатор для создания канала и заказа"""
-    # Поля канала
-    channel_id = serializers.CharField(max_length=255, required=True)
-    channel_name = serializers.CharField(max_length=255, required=True)
-    tags = serializers.ListField(child=serializers.CharField(), required=False, default=list)
-
-    # Поля заказа
-    order_name = serializers.CharField(max_length=255, required=True)
-    spm = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
-    budget = serializers.DecimalField(max_digits=15, decimal_places=2, required=True)
-    max_views_per_user = serializers.IntegerField(default=1)
-    is_active = serializers.BooleanField(default=True)
-
-    def validate(self, data):
-        if data['spm'] <= 0:
-            raise serializers.ValidationError({"spm": "SPM должен быть больше 0."})
-
-        if data['budget'] <= 0:
-            raise serializers.ValidationError({"budget": "Бюджет должен быть больше 0."})
-
-        if data['max_views_per_user'] <= 0:
-            raise serializers.ValidationError({"max_views_per_user": "max_views_per_user должен быть больше 0."})
-
-        return data
-
-    def create(self, validated_data):
-        user = self.context['request'].user
-        tag_names = validated_data.get('tags', [])
-        budget = validated_data['budget']
-
-        # Проверяем баланс
-        balance = user.balance
-        if balance.amount < budget:
-            raise serializers.ValidationError(
-                {"budget": f"Недостаточно средств. Доступно: {balance.amount}"}
-            )
-
-        # Списываем средства
-        if not balance.withdraw(budget):
-            raise serializers.ValidationError(
-                {"budget": "Ошибка списания средств"}
-            )
-
-        # Создаем или обновляем канал
-        channel, created = Channel.objects.update_or_create(
-            channel_id=validated_data['channel_id'],
-            user=user,
-            defaults={
-                'channel_name': validated_data['channel_name'],
-            }
-        )
-
-        # Добавляем теги к каналу (если есть новые)
-        if tag_names:
-            channel.add_tags(tag_names)
-
-        # Создаем заказ с временным атрибутом для тегов
-        order = Order(
-            channel_id=channel,
-            user=user,
-            channel_name=validated_data['channel_name'],
-            order_name=validated_data['order_name'],
-            spm=validated_data['spm'],
-            budget=validated_data['budget'],
-            is_active=validated_data['is_active'],
-            max_views_per_user=validated_data['max_views_per_user'],
-        )
-
-        # Сохраняем теги во временный атрибут
-        order._tag_names = tag_names
-        order.save()
-
-        return {
-            'channel': ChannelSerializer(channel).data,
-            'order': OrderSerializer(order).data
-        }

@@ -7,17 +7,17 @@ from django.db import transaction
 from apps.common.pagination import StandardResultsSetPagination
 
 from apps.search_ads.models import Order
-from apps.search_ads.serializer.orders_serializer import (OrderDetailSerializer, ChannelOrderSerializer,
+from apps.search_ads.serializer.orders_serializer import (OrderDetailSerializer, CreateChannelOrderSerializer,
                                                           OrderActivationSerializer, ResponsesMessageSerializer)
 
 
 
 class CreateChannelOrderView(generics.CreateAPIView):
     """Создание канала и заказа в одном запросе"""
-    serializer_class = ChannelOrderSerializer
+    serializer_class = CreateChannelOrderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    @extend_schema(request=ChannelOrderSerializer, responses=ResponsesMessageSerializer)
+    @extend_schema(request=CreateChannelOrderSerializer, responses=ResponsesMessageSerializer)
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
