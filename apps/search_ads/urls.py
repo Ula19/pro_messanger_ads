@@ -1,9 +1,7 @@
 from django.urls import path
 
-from apps.search_ads.views.search_views import SearchChannelsView, ClickView
-from apps.search_ads.views.orders_views import OrderListView, ActiveOrderListView, OrderActivationView, OrderDetailView, \
-    CancelOrderView, CreateChannelOrderView
-
+from apps.search_ads.views import (OrderListView, ActiveOrderListView, OrderActivationView, OrderDetailView,
+                                   CancelOrderView, CreateChannelOrderView, SearchChannelsView, ClickView)
 
 
 urlpatterns = [

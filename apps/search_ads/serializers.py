@@ -1,10 +1,11 @@
 from django.db import transaction
-from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
 
 from apps.search_ads.models import Channel, Order, Tag
 
 
+# ============================================ ORDER CRUD ==========================================================
 
 class CreateChannelOrderSerializer(serializers.Serializer):
     """Сериализатор для создания канала и заказа"""
@@ -210,3 +211,38 @@ class OrderActivationSerializer(serializers.Serializer):
 
 class ResponsesMessageSerializer(serializers.Serializer):
     message = serializers.CharField()
+
+
+# ============================================ ORDER SEARCH AND CLICK ==================================================
+
+class SearchResultSerializer(serializers.Serializer):
+    """Сериализатор для результата поиска"""
+    channel_id = serializers.CharField()
+    channel_name = serializers.CharField()
+    order_id = serializers.UUIDField()
+
+
+class SearchRequestSerializer(serializers.Serializer):
+    """Сериализатор для запроса поиска"""
+    tag = serializers.CharField(required=True)
+    viewer_id = serializers.CharField(required=True, help_text='ID пользователя, который ищет канал')
+
+
+class ClickOrderSerializer(serializers.Serializer):
+    order_id = serializers.UUIDField(required=True)
+    viewer_id = serializers.CharField(required=True, help_text='ID пользователя который посмотрел канал')
+
+    def validate(self, attrs):
+        order_id = attrs.get('order_id')
+
+        try:
+            order = Order.objects.only('order_id', 'clicks', 'is_active').get(
+                order_id=order_id,
+                is_active=True
+            )
+        except Order.DoesNotExist:
+            raise serializers.ValidationError({"order_id": "Активный ордер не найден"})
+
+        # Кладем найденный объект в данные, чтобы view могла его забрать
+        attrs['order_object'] = order
+        return attrs
