@@ -24,10 +24,10 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/', include('apps.search_ads.urls')),
     path('api/', include('apps.billing.urls')),
     path('api/auth/', include('apps.account.urls')),
-    path('api/chat_post/', include('apps.chat_ads.urls')),
+    path('api/search_ads/', include('apps.search_ads.urls')),
+    path('api/chat_ads/', include('apps.chat_ads.urls')),
 ]
 
 if settings.DEBUG:
