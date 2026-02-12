@@ -1,6 +1,9 @@
+import os
+import subprocess
 import uuid
 from decimal import Decimal
 
+from django.core.files.base import ContentFile
 from django.conf import settings
 from django.core.validators import MinValueValidator, FileExtensionValidator
 from django.db import models
@@ -39,6 +42,68 @@ class ChatAdMedia(models.Model):
         verbose_name = 'Медиа рекламы'
         verbose_name_plural = 'Медиа рекламы'
         ordering = ['-created_at']
+
+    def save(self, *args, **kwargs):
+        # 1. Сначала вызываем базовый метод, чтобы файл физически лег на диск
+        super().save(*args, **kwargs)
+
+        # 2. Проверяем, является ли файл видео и нужно ли его конвертировать
+        # Условие: файл есть, тип VIDEO и мы еще не пометили его как 'обработанный' (опционально)
+        if self.file and self.media_type == self.MediaType.VIDEO:
+            self.convert_to_h264()
+
+    def convert_to_h264(self):
+        input_path = self.file.path
+        # Создаем имя для временного выходного файла
+        output_filename = f"converted_{uuid.uuid4()}.mp4"
+        output_path = os.path.join(os.path.dirname(input_path), output_filename)
+
+        try:
+            # Команда FFmpeg:
+            # -i: входной файл
+            # -vcodec libx264: принудительный кодек H.264
+            # -acodec aac: кодек звука, совместимый с большинством устройств
+            # -preset ultrafast: максимально быстрая конвертация (важно для HTTP-запроса)
+            # -y: перезаписать если существует
+            command = [
+                'ffmpeg', '-i', input_path,
+                '-vcodec', 'libx264',
+                '-acodec', 'aac',
+                '-preset', 'ultrafast',  # скорость конвертации (не качество!)
+                '-movflags', '+faststart',  # <<< КРИТИЧЕСКИ ВАЖНО
+                '-vf', 'scale=1280:720',  # уменьшить до 720p (можно 854x480 для экономии)
+                '-b:v', '1M',  # видеобитрейт 1 Мбит/с
+                '-b:a', '128k',  # аудиобитрейт
+                '-y', output_path
+            ]
+
+            # Запускаем процесс
+            subprocess.run(command, check=True, capture_output=True)
+
+            # 3. Заменяем старый файл новым
+            with open(output_path, 'rb') as f:
+                # Удаляем старый файл с диска перед заменой
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+
+                # Сохраняем новый контент в поле file без повторного вызова save() в бесконечном цикле
+                self.file.save(
+                    os.path.basename(output_path).replace('converted_', ''),
+                    ContentFile(f.read()),
+                    save=False
+                )
+
+            # Чистим временный файл
+            if os.path.exists(output_path):
+                os.remove(output_path)
+
+            # Сохраняем изменения в БД (только поле file)
+            super().save(update_fields=['file'])
+
+        except subprocess.CalledProcessError as e:
+            print(f"Ошибка FFmpeg: {e.stderr.decode()}")
+        except Exception as e:
+            print(f"Общая ошибка при конвертации: {e}")
 
     def __str__(self):
         return f"{self.media_type} by {self.user.username} ({self.id})"

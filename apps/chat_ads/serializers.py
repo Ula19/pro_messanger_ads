@@ -20,11 +20,11 @@ class ChatAdMediaSerializer(serializers.ModelSerializer):
         content_type = value.content_type
         if content_type.startswith('image'):
             self.context['media_type'] = ChatAdMedia.MediaType.IMAGE
-            if value.size > 2 * 1024 * 1024:  # 5 MB
+            if value.size > 2 * 1024 * 1024:  # 2 MB
                 raise serializers.ValidationError("Размер изображения не более 5 МБ")
         elif content_type.startswith('video'):
             self.context['media_type'] = ChatAdMedia.MediaType.VIDEO
-            if value.size > 10 * 1024 * 1024:  # 50 MB
+            if value.size > 10 * 1024 * 1024:  # 10 MB
                 raise serializers.ValidationError("Размер видео не более 50 МБ")
         else:
             raise serializers.ValidationError("Неподдерживаемый формат файла")

@@ -7,7 +7,8 @@ RUN apk update && apk add --no-cache \
     python3-dev \
     musl-dev \
     libffi-dev \
-    openssl-dev
+    openssl-dev \
+    ffmpeg
 
 WORKDIR /app
 
