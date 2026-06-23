@@ -90,10 +90,10 @@ services:
   nginx:
     image: nginx:alpine
     container_name: channel_nginx_2
-    # Слушаем только локально на 8080. Наружу домен отдаёт системный nginx хоста,
-    # который проксирует ads-api.vipads.uz -> 127.0.0.1:8080.
+    # Слушаем только локально на 18080. Наружу домен отдаёт системный nginx хоста,
+    # который проксирует ads-api.vipads.uz -> 127.0.0.1:18080.
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:18080:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - static_volume:/app/staticfiles:ro
