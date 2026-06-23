@@ -124,12 +124,17 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 CSRF_TRUSTED_ORIGINS = [
+    "https://ads-api.vipads.uz",
     "http://185.203.241.191:8000",
     "http://185.203.241.191",
     "http://localhost:8000",
     "http://localhost",
     "https://nonmutational-hipolito-unravaged.ngrok-free.dev"
 ]
+
+# nginx терминирует TLS и проксирует на gunicorn по http.
+# Этот заголовок говорит Django, что исходный запрос был по https (нужно для CSRF и request.is_secure()).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 CORS_ALLOW_ALL_ORIGINS = True
 # Разрешаем куки (если нужна авторизация)
