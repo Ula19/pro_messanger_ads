@@ -6,6 +6,19 @@ from .models import ChatAdMedia
 
 
 @app.task
+def convert_media_to_h264(media_id):
+    """Фоновая конвертация загруженного видео в H.264.
+    Ставится в очередь из ChatAdMedia.save() после загрузки файла."""
+    try:
+        media = ChatAdMedia.objects.get(id=media_id)
+    except ChatAdMedia.DoesNotExist:
+        return f"Медиа {media_id} не найдено (возможно, удалено)"
+
+    media.convert_to_h264()
+    return f"Видео {media_id} сконвертировано в H.264"
+
+
+@app.task
 def cleanup_orphaned_media():
     # Удаляем файлы, созданные более 24 часов назад И не привязанные к заказу
     deadline = timezone.now() - timedelta(hours=24)

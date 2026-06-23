@@ -1,3 +1,4 @@
+import logging
 import os
 import subprocess
 import uuid
@@ -6,7 +7,9 @@ from decimal import Decimal
 from django.core.files.base import ContentFile
 from django.conf import settings
 from django.core.validators import MinValueValidator, FileExtensionValidator
-from django.db import models
+from django.db import models, transaction
+
+logger = logging.getLogger(__name__)
 
 
 class ChatAdMedia(models.Model):
@@ -44,13 +47,17 @@ class ChatAdMedia(models.Model):
         ordering = ['-created_at']
 
     def save(self, *args, **kwargs):
+        is_new = self._state.adding
+
         # 1. Сначала вызываем базовый метод, чтобы файл физически лег на диск
         super().save(*args, **kwargs)
 
-        # 2. Проверяем, является ли файл видео и нужно ли его конвертировать
-        # Условие: файл есть, тип VIDEO и мы еще не пометили его как 'обработанный' (опционально)
-        if self.file and self.media_type == self.MediaType.VIDEO:
-            self.convert_to_h264()
+        # 2. Конвертацию видео в H.264 выполняем в фоне (Celery), а не прямо в HTTP-запросе.
+        # Иначе тяжёлый FFmpeg блокирует воркер gunicorn на всё время перекодирования.
+        # on_commit гарантирует, что строка уже в БД, когда воркер её прочитает.
+        if is_new and self.file and self.media_type == self.MediaType.VIDEO:
+            from .tasks import convert_media_to_h264
+            transaction.on_commit(lambda: convert_media_to_h264.delay(str(self.id)))
 
     def convert_to_h264(self):
         input_path = self.file.path
@@ -101,9 +108,11 @@ class ChatAdMedia(models.Model):
             super().save(update_fields=['file'])
 
         except subprocess.CalledProcessError as e:
-            print(f"Ошибка FFmpeg: {e.stderr.decode()}")
+            logger.error("Ошибка FFmpeg при конвертации %s: %s", self.id, e.stderr.decode(errors='ignore'))
+            raise
         except Exception as e:
-            print(f"Общая ошибка при конвертации: {e}")
+            logger.error("Общая ошибка при конвертации %s: %s", self.id, e)
+            raise
 
     def __str__(self):
         return f"{self.media_type} by {self.user.username} ({self.id})"
@@ -321,9 +330,11 @@ class ChatAdView(models.Model):
         return self.view_count < self.order.max_views_per_user
 
     def increment_view(self):
-        """Увеличивает счетчик просмотров"""
-        self.view_count += 1
+        """Увеличивает счетчик просмотров (атомарно, без потери конкурентных инкрементов)"""
+        self.view_count = models.F('view_count') + 1
         self.save(update_fields=['view_count', 'last_viewed_at'])
+        # F-выражение оставляет в self.view_count объект-выражение, возвращаем нормальное число
+        self.refresh_from_db(fields=['view_count'])
         return True
 
     def mark_as_clicked(self):

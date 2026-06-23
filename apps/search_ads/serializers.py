@@ -2,6 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 
+from apps.billing.models import Balance
 from apps.search_ads.models import Channel, Order, Tag
 
 
@@ -35,16 +36,17 @@ class CreateChannelOrderSerializer(serializers.Serializer):
         tag_names = validated_data.get('tags', [])
         budget = validated_data['budget']
 
-        # 1. Проверяем баланс
-        balance = user.balance
-        if balance.amount < budget:
-            raise serializers.ValidationError(
-                {"budget": f"Недостаточно средств. Доступно: {balance.amount}"}
-            )
-
         # Используем транзакцию, чтобы все создалось или ничего
         with transaction.atomic():
-            # 2. Списываем средства
+            # 1. Блокируем строку баланса (select_for_update), чтобы два параллельных
+            # заказа не могли оба пройти проверку и уйти в минус (защита от гонки).
+            balance = Balance.objects.select_for_update().get(user=user)
+
+            # 2. Проверяем баланс и списываем средства уже под блокировкой
+            if balance.amount < budget:
+                raise serializers.ValidationError(
+                    {"budget": f"Недостаточно средств. Доступно: {balance.amount}"}
+                )
             if not balance.withdraw(budget):
                 raise serializers.ValidationError({"budget": "Ошибка списания средств"})
 

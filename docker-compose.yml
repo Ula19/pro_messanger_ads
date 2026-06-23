@@ -4,17 +4,17 @@ services:
   db:
     image: postgres:15-alpine
     container_name: channel_db_2
+    # Креды берутся из .env (compose подставляет ${...} автоматически), не хардкодим в репозитории.
+    # Порт наружу НЕ публикуем — база доступна только внутри docker-сети по имени 'db'.
     environment:
-      POSTGRES_DB: channel_db
-      POSTGRES_USER: channel_user_2
-      POSTGRES_PASSWORD: channel_pass123
-    ports:
-      - "5433:5433"
+      POSTGRES_DB: ${DATABASES_NAME}
+      POSTGRES_USER: ${DATABASES_USER}
+      POSTGRES_PASSWORD: ${DATABASES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck: # Проверка готовности базы
-      test: [ "CMD-SHELL", "pg_isready -U channel_user_2 -d channel_db" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DATABASES_USER} -d ${DATABASES_NAME}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -39,24 +39,14 @@ services:
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+    # Все переменные (SECRET_KEY, DEBUG, ALLOWED_HOSTS, DATABASES_*) приходят из .env через env_file.
+    # Порт наружу НЕ публикуем — доступ к Django только через nginx.
     env_file:
       - .env
     environment:
-      - SECRET_KEY=${SECRET_KEY}
-      - DEBUG=True
-#      - DEBUG=${DEBUG}
-      - DATABASES_NAME=channel_db
-      - DATABASES_USER=channel_user_2
-      - DATABASES_PASSWORD=channel_pass123
-      - DATABASES_HOST=db
-      - DATABASES_PORT=5432
-#      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - ALLOWED_HOSTS=localhost,127.0.0.1,185.203.241.191,nonmutational-hipolito-unravaged.ngrok-free.dev
       # Настройки для Celery внутри Docker (хост - имя сервиса 'redis')
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    ports:
-      - 9000:9000
     depends_on:
       db:
         condition: service_healthy
@@ -74,11 +64,6 @@ services:
       - .env
     environment:
       - DEBUG=False
-      - DATABASES_NAME=channel_db
-      - DATABASES_USER=channel_user_2
-      - DATABASES_PASSWORD=channel_pass123
-      - DATABASES_HOST=db
-      - DATABASES_PORT=5432
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
@@ -95,11 +80,6 @@ services:
       - .env
     environment:
       - DEBUG=False
-      - DATABASES_NAME=channel_db
-      - DATABASES_USER=channel_user_2
-      - DATABASES_PASSWORD=channel_pass123
-      - DATABASES_HOST=db
-      - DATABASES_PORT=5432
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
