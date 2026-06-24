@@ -124,6 +124,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 CSRF_TRUSTED_ORIGINS = [
+    "https://ads-api.vipads.uz",
     "http://ads-api.vipads.uz",
     "http://185.203.241.191:8000",
     "http://185.203.241.191",
@@ -131,6 +132,10 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost",
     "https://nonmutational-hipolito-unravaged.ngrok-free.dev"
 ]
+
+# TLS терминируется на системном nginx хоста, до Django запрос доходит по http.
+# Этот заголовок (его пробрасывают nginx-ы) говорит Django, что оригинальный запрос был https.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 CORS_ALLOW_ALL_ORIGINS = True
 # Разрешаем куки (если нужна авторизация)
