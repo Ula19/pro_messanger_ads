@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'apps.common',
     'apps.account',
     'apps.billing',
+    'apps.partner',
 ]
 
 MIDDLEWARE = [
@@ -231,3 +232,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
 CELERY_TIMEZONE = 'Asia/Tashkent'
+
+# Партнёрская программа: доля канала-площадки от цены показа по умолчанию.
+# 0.5 = 50% (остальное забирает платформа). Можно переопределить на конкретном
+# канале через поле ChannelEarning.share_rate. Строкой — чтобы Decimal был точным.
+PARTNER_SHARE_RATE = os.getenv('PARTNER_SHARE_RATE', '0.5')

@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from apps.common.pagination import StandardResultsSetPagination
 
 from apps.billing.models import Balance
+from apps.partner.models import ChannelEarning
 from .models import ChatAdOrder, ChatAdMedia, ChatAdView
 from .serializers import ChatAdMediaSerializer, ChatAdOrderSerializer, ChatAdOrderActivationSerializer, \
     ChatAdResponsesMessageSerializer, AdRequestSerializer, ChatAdSearchSerializer, ChatAdClickOrderSerializer
@@ -256,6 +257,10 @@ class GetChatAdView(APIView):
 
                 # 1. Списываем глобальный просмотр (бюджет)
                 locked_order.decrement_views()
+
+                # 1.1 Начисляем заработок каналу-площадке за этот показ (50% от цены показа).
+                # В той же транзакции — деньги площадки и списание просмотра атомарны вместе.
+                ChannelEarning.accrue(channel_name, locked_order)
 
                 # 2. Логика сохранения истории просмотра (Требование пользователя)
                 if locked_order.max_views_per_user != -1:

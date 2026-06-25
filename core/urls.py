@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/auth/', include('apps.account.urls')),
     path('api/search_ads/', include('apps.search_ads.urls')),
     path('api/chat_ads/', include('apps.chat_ads.urls')),
+    path('api/partner/', include('apps.partner.urls')),
 ]
 
 if settings.DEBUG:
