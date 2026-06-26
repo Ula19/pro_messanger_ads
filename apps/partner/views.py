@@ -15,23 +15,25 @@ from .serializers import (
 class PublicEarningView(APIView):
     """
     «Крючок»: показать незарегистрированному владельцу, сколько уже накопил его канал.
-    GET /api/partner/earnings/?channel_name=...
+    GET /api/partner/earnings/?channel_id=...
     """
     permission_classes = [permissions.AllowAny]
 
     @extend_schema(responses=PublicEarningSerializer)
     def get(self, request):
-        raw_name = request.query_params.get('channel_name', '')
-        norm = ChannelEarning.normalize_name(raw_name)
-        if not norm:
-            return Response({'error': 'Укажите channel_name'}, status=status.HTTP_400_BAD_REQUEST)
+        raw_id = request.query_params.get('channel_id', '')
+        try:
+            channel_id = int(raw_id)
+        except (TypeError, ValueError):
+            return Response({'error': 'Укажите числовой channel_id'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            earning = ChannelEarning.objects.get(channel_name=norm)
+            earning = ChannelEarning.objects.get(channel_id=channel_id)
         except ChannelEarning.DoesNotExist:
             # Канал ещё ничего не заработал — отдаём нули, а не 404 (удобнее для витрины).
             return Response({
-                'channel_name': norm,
+                'channel_id': channel_id,
+                'channel_name': '',
                 'total_earned': '0.0000',
                 'total_impressions': 0,
                 'is_claimed': False,
@@ -42,8 +44,9 @@ class PublicEarningView(APIView):
 
 class ClaimChannelView(APIView):
     """
-    Заявить права на канал-площадку. Подтверждает админ вручную (этап разработки).
-    POST /api/partner/claim/  body: {"channel_name": "..."}
+    Заявить права на канал-площадку. Доверяем клиенту (он подтвердил владение
+    на стороне Telegram) — закрепляем сразу.
+    POST /api/partner/claim/  body: {"channel_id": 123, "channel_name": "..."}
     """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ClaimRequestSerializer
@@ -52,12 +55,11 @@ class ClaimChannelView(APIView):
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        norm = ChannelEarning.normalize_name(serializer.validated_data['channel_name'])
-        if not norm:
-            return Response({'error': 'Некорректное имя канала'}, status=status.HTTP_400_BAD_REQUEST)
+        channel_id = serializer.validated_data['channel_id']
+        norm_name = ChannelEarning.normalize_name(serializer.validated_data.get('channel_name'))
 
         with transaction.atomic():
-            earning, _ = ChannelEarning.objects.select_for_update().get_or_create(channel_name=norm)
+            earning, _ = ChannelEarning.objects.select_for_update().get_or_create(channel_id=channel_id)
 
             if earning.claim_status == ChannelEarning.ClaimStatus.CONFIRMED:
                 if earning.owner_id == request.user.id:
@@ -65,18 +67,11 @@ class ClaimChannelView(APIView):
                 return Response({'error': 'Канал уже закреплён за другим пользователем'},
                                 status=status.HTTP_409_CONFLICT)
 
-            if earning.claim_status == ChannelEarning.ClaimStatus.PENDING:
-                if earning.pending_owner_id == request.user.id:
-                    return Response({'message': 'Заявка уже подана и ожидает подтверждения'},
-                                    status=status.HTTP_200_OK)
-                return Response({'error': 'По каналу уже есть заявка от другого пользователя'},
-                                status=status.HTTP_409_CONFLICT)
+            if norm_name and norm_name != earning.channel_name:
+                earning.channel_name = norm_name
+            earning.claim_by(request.user)
 
-            earning.pending_owner = request.user
-            earning.claim_status = ChannelEarning.ClaimStatus.PENDING
-            earning.save(update_fields=['pending_owner', 'claim_status', 'updated_at'])
-
-        return Response({'message': 'Заявка подана. Ожидайте подтверждения.'}, status=status.HTTP_201_CREATED)
+        return Response({'message': 'Канал закреплён за вами'}, status=status.HTTP_201_CREATED)
 
 
 class MyEarningsView(generics.ListAPIView):
@@ -92,7 +87,7 @@ class MyEarningsView(generics.ListAPIView):
 class WithdrawEarningView(APIView):
     """
     Перевести доступный заработок канала на рекламный баланс.
-    POST /api/partner/withdraw/  body: {"channel_name": "..."}
+    POST /api/partner/withdraw/  body: {"channel_id": 123}
     """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = WithdrawRequestSerializer
@@ -101,12 +96,12 @@ class WithdrawEarningView(APIView):
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        norm = ChannelEarning.normalize_name(serializer.validated_data['channel_name'])
+        channel_id = serializer.validated_data['channel_id']
 
         with transaction.atomic():
             try:
                 earning = ChannelEarning.objects.select_for_update().get(
-                    channel_name=norm, owner=request.user,
+                    channel_id=channel_id, owner=request.user,
                     claim_status=ChannelEarning.ClaimStatus.CONFIRMED,
                 )
             except ChannelEarning.DoesNotExist:

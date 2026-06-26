@@ -206,6 +206,7 @@ class GetChatAdView(APIView):
 
         channel_name = input_serializer.validated_data['channel_name']
         viewer_id = input_serializer.validated_data['viewer_id']
+        channel_id = input_serializer.validated_data.get('channel_id')
 
         # 2. Поиск кандидатов (Грубая фильтрация)
         # Мы ищем все активные заказы, где название канала упоминается в строке channels
@@ -259,8 +260,9 @@ class GetChatAdView(APIView):
                 locked_order.decrement_views()
 
                 # 1.1 Начисляем заработок каналу-площадке за этот показ (50% от цены показа).
-                # В той же транзакции — деньги площадки и списание просмотра атомарны вместе.
-                ChannelEarning.accrue(channel_name, locked_order)
+                # Ключ — числовой channel_id; имя передаём как метку. В той же транзакции —
+                # деньги площадки и списание просмотра атомарны вместе.
+                ChannelEarning.accrue(channel_id, locked_order, channel_name=channel_name)
 
                 # 2. Логика сохранения истории просмотра (Требование пользователя)
                 if locked_order.max_views_per_user != -1:

@@ -9,26 +9,33 @@ class ChannelEarning(models.Model):
     """
     Счёт заработка канала-площадки.
 
-    Одна строка на канал (по нормализованному имени). Заработок копится здесь
-    ДО того, как владелец канала зарегистрируется в приложении: ключом служит
-    имя канала, а не пользователь. Когда владелец заходит и подтверждает права
-    на канал (claim), к строке привязывается `owner`, и он может вывести деньги.
+    Одна строка на канал, ключ — числовой `channel_id` из Telegram (неизменен,
+    в отличие от @username, который можно сменить/переиспользовать). Заработок
+    копится здесь ДО того, как владелец зарегистрируется в приложении. Когда
+    владелец заявляет права (claim), к строке привязывается `owner` и он может
+    вывести деньги. Имя канала храним лишь как удобную метку.
     """
 
     class ClaimStatus(models.TextChoices):
         UNCLAIMED = 'UNCLAIMED', 'Не заявлен'
-        PENDING = 'PENDING', 'Ожидает подтверждения'
         CONFIRMED = 'CONFIRMED', 'Подтверждён'
 
-    # Нормализованное имя канала — ключ начисления.
-    channel_name = models.CharField(
-        verbose_name='Канал-площадка',
-        max_length=255,
+    # Числовой id канала в Telegram — ключ начисления.
+    channel_id = models.BigIntegerField(
+        verbose_name='ID канала (Telegram)',
         unique=True,
         db_index=True,
     )
+    # Имя/@username канала — только метка для витрины, может меняться.
+    channel_name = models.CharField(
+        verbose_name='Имя канала (метка)',
+        max_length=255,
+        blank=True,
+        default='',
+        db_index=True,
+    )
 
-    # Владелец. Заполняется только после подтверждения (CONFIRMED).
+    # Владелец. Заполняется после подтверждения claim (CONFIRMED).
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -36,15 +43,6 @@ class ChannelEarning(models.Model):
         blank=True,
         related_name='channel_earnings',
         verbose_name='Владелец',
-    )
-    # Кто запросил права (ждёт подтверждения админом).
-    pending_owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='pending_channel_earnings',
-        verbose_name='Заявитель',
     )
     claim_status = models.CharField(
         verbose_name='Статус заявки',
@@ -94,11 +92,12 @@ class ChannelEarning(models.Model):
         ordering = ['-total_earned']
 
     def __str__(self):
-        return f"{self.channel_name}: {self.available} (всего {self.total_earned})"
+        label = self.channel_name or self.channel_id
+        return f"{label}: {self.available} (всего {self.total_earned})"
 
     @staticmethod
     def normalize_name(name):
-        """Приводим имя канала к единому виду, чтобы начисление и claim совпадали."""
+        """Приводим имя канала к единому виду (только для метки-витрины)."""
         if not name:
             return ''
         return name.strip().lstrip('@').lower()
@@ -110,33 +109,39 @@ class ChannelEarning(models.Model):
         return Decimal(str(settings.PARTNER_SHARE_RATE))
 
     @classmethod
-    def accrue(cls, channel_name, order, impressions=1):
+    def accrue(cls, channel_id, order, impressions=1, channel_name=None):
         """
         Начисляет заработок каналу-площадке за показ(ы) рекламы.
 
-        Вызывать ВНУТРИ transaction.atomic() — в момент показа, после списания
-        просмотра. Счётчики наращиваются F-выражениями (защита от гонок),
-        отдельная строка-агрегат в EarningTransaction копит разбивку по заказу.
+        Ключ — числовой `channel_id`. Вызывать ВНУТРИ transaction.atomic() —
+        в момент показа, после списания просмотра. Счётчики наращиваются
+        F-выражениями (защита от гонок), отдельная строка-агрегат в
+        EarningTransaction копит разбивку по заказу. `channel_name` — лишь
+        метка, обновляем её, если прислали свежую.
 
         Сумму НЕ округляем — точность 4 знака сохраняет доли тийина.
-        Возвращает начисленную сумму (Decimal) либо None, если имя пустое.
+        Возвращает начисленную сумму (Decimal) либо None, если id пуст.
         """
-        norm = cls.normalize_name(channel_name)
-        if not norm or impressions <= 0:
+        if channel_id is None or impressions <= 0:
             return None
 
-        earning, _ = cls.objects.get_or_create(channel_name=norm)
+        earning, _ = cls.objects.get_or_create(channel_id=channel_id)
 
         rate = earning.get_share_rate()
         price_per_impression = order.spm / Decimal(1000)
         amount = price_per_impression * Decimal(rate) * Decimal(impressions)
 
         # Атомарно наращиваем счётчики счёта.
-        cls.objects.filter(pk=earning.pk).update(
-            available=models.F('available') + amount,
-            total_earned=models.F('total_earned') + amount,
-            total_impressions=models.F('total_impressions') + impressions,
-        )
+        updates = {
+            'available': models.F('available') + amount,
+            'total_earned': models.F('total_earned') + amount,
+            'total_impressions': models.F('total_impressions') + impressions,
+        }
+        # Освежаем метку-имя, если прислали и она изменилась.
+        norm = cls.normalize_name(channel_name)
+        if norm and norm != earning.channel_name:
+            updates['channel_name'] = norm
+        cls.objects.filter(pk=earning.pk).update(**updates)
 
         # Лог-агрегат: одна строка на пару (канал, заказ).
         txn, created = EarningTransaction.objects.get_or_create(
@@ -184,15 +189,19 @@ class ChannelEarning(models.Model):
         )
         return payout
 
-    def confirm_claim(self):
-        """Подтверждает права заявителя на канал (используется в админке)."""
-        if not self.pending_owner:
-            raise ValueError('Нет заявителя для подтверждения')
-        self.owner = self.pending_owner
-        self.pending_owner = None
+    def claim_by(self, user):
+        """
+        Закрепляет канал за пользователем.
+
+        Доверяем клиенту (NovaGram): он залогинен под пользователем и сам видит,
+        что тот — создатель канала, поэтому подтверждаем сразу, без ручного шага.
+        Конфликт (канал уже за другим) проверяется во view под select_for_update.
+        """
+        self.owner = user
         self.claim_status = self.ClaimStatus.CONFIRMED
         self.claimed_at = timezone.now()
-        self.save(update_fields=['owner', 'pending_owner', 'claim_status', 'claimed_at', 'updated_at'])
+        # channel_name включён, чтобы свежая метка (если её обновили перед claim) сохранилась.
+        self.save(update_fields=['owner', 'claim_status', 'claimed_at', 'channel_name', 'updated_at'])
 
 
 class EarningTransaction(models.Model):

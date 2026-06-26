@@ -225,6 +225,12 @@ class AdRequestSerializer(serializers.Serializer):
     """Валидация входящего запроса на получение рекламы"""
     channel_name = serializers.CharField(max_length=255, required=True)
     viewer_id = serializers.CharField(max_length=255, required=True)
+    # Числовой id канала-площадки. Нужен для начисления заработка площадке.
+    # Если не прислан — реклама всё равно покажется, но заработок не начислится.
+    channel_id = serializers.IntegerField(
+        required=False, allow_null=True,
+        help_text='Числовой id канала-площадки в Telegram (для начисления заработка площадке)'
+    )
 
 
 class ChatAdSearchSerializer(serializers.ModelSerializer):

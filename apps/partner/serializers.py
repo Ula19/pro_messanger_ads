@@ -10,7 +10,7 @@ class PublicEarningSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChannelEarning
-        fields = ['channel_name', 'total_earned', 'total_impressions', 'is_claimed']
+        fields = ['channel_id', 'channel_name', 'total_earned', 'total_impressions', 'is_claimed']
 
     @extend_schema_field(serializers.BooleanField())
     def get_is_claimed(self, obj):
@@ -24,7 +24,7 @@ class MyEarningSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChannelEarning
         fields = [
-            'channel_name', 'available', 'total_earned', 'total_impressions',
+            'channel_id', 'channel_name', 'available', 'total_earned', 'total_impressions',
             'claim_status', 'share_rate', 'claimed_at',
         ]
 
@@ -34,11 +34,13 @@ class MyEarningSerializer(serializers.ModelSerializer):
 
 
 class ClaimRequestSerializer(serializers.Serializer):
-    channel_name = serializers.CharField(max_length=255, required=True)
+    channel_id = serializers.IntegerField(required=True)
+    # Необязательная метка-имя для витрины (если клиент его знает).
+    channel_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
 
 class WithdrawRequestSerializer(serializers.Serializer):
-    channel_name = serializers.CharField(max_length=255, required=True)
+    channel_id = serializers.IntegerField(required=True)
 
 
 class EarningTransactionSerializer(serializers.ModelSerializer):

@@ -6,14 +6,14 @@ from apps.account.models import CustomUser
 
 @admin.register(CustomUser)
 class UserAdmin(UserAdmin):
-    list_display = ('username', 'user_id', 'is_admin')
-    search_fields = ('username', 'user_id')
+    list_display = ('username', 'user_id', 'telegram_id', 'is_admin')
+    search_fields = ('username', 'user_id', 'telegram_id')
     list_per_page = 20
     search_help_text = 'USERNAME ni yoki USER ID ni kiritng'
 
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
-        ('Personal info', {'fields': ('first_name', 'last_name', 'email')}),
+        ('Personal info', {'fields': ('first_name', 'last_name', 'email', 'telegram_id')}),
         ('Permissions', {
             'fields': ('is_active', 'is_staff', 'is_superuser', 'is_admin', 'groups', 'user_permissions'),
         }),
