@@ -120,6 +120,11 @@ class ChatAdMedia(models.Model):
 
 class ChatAdOrder(models.Model):
     """Модель рекламы для чатов каналов"""
+
+    class Platform(models.TextChoices):
+        TELEGRAM = 'TELEGRAM', 'Telegram'
+        NOVAGRAM = 'NOVAGRAM', 'Novagram'
+
     order_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, primary_key=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='chat_ads',
                              verbose_name='Пользователь')
@@ -128,6 +133,8 @@ class ChatAdOrder(models.Model):
     order_name = models.CharField(verbose_name='Название заказа', max_length=255)
     text = models.TextField(verbose_name='Текст рекламы', help_text='Основной текст рекламного сообщения')
     link = models.CharField(verbose_name='Ссылка рекламы', help_text='URL для перехода по рекламе')
+    platform = models.CharField(verbose_name='Платформа', max_length=20,
+                                choices=Platform.choices, default=Platform.TELEGRAM)
 
     # Поле для указания каналов (строка с названиями через запятую)
     channels = models.TextField(verbose_name='Каналы для показа',

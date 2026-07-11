@@ -53,12 +53,19 @@ class Channel(models.Model):
 
 class Order(models.Model):
     """Модель рекламы"""
+
+    class Platform(models.TextChoices):
+        TELEGRAM = 'TELEGRAM', 'Telegram'
+        NOVAGRAM = 'NOVAGRAM', 'Novagram'
+
     order_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, primary_key=True)
     channel_id = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name='orders')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='orders', verbose_name='User')
     channel_name = models.CharField(verbose_name='Channel Name', max_length=255)
     order_name = models.CharField(verbose_name='Order Name', max_length=255)
     tags = models.ManyToManyField(Tag, related_name='orders', blank=True, verbose_name='Tags')
+    platform = models.CharField(verbose_name='Платформа', max_length=20,
+                                choices=Platform.choices, default=Platform.TELEGRAM)
 
     # Параметры заказа
     spm = models.DecimalField(verbose_name='SPM', max_digits=10, decimal_places=2,

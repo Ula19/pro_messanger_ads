@@ -17,6 +17,7 @@ class CreateChannelOrderSerializer(serializers.Serializer):
 
     # Поля для создания заказа
     order_name = serializers.CharField(max_length=255, required=True)
+    platform = serializers.ChoiceField(choices=Order.Platform.choices, default=Order.Platform.TELEGRAM)
     spm = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
     budget = serializers.DecimalField(max_digits=15, decimal_places=2, required=True)
     max_views_per_user = serializers.IntegerField(default=1)
@@ -67,6 +68,7 @@ class CreateChannelOrderSerializer(serializers.Serializer):
                 user=user,
                 channel_name=validated_data['channel_name'],
                 order_name=validated_data['order_name'],
+                platform=validated_data['platform'],
                 spm=validated_data['spm'],
                 budget=validated_data['budget'],
                 is_active=validated_data['is_active'],
@@ -115,7 +117,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = [
-            'order_id', 'channel_id', 'channel_name', 'order_name', 'tags',
+            'order_id', 'channel_id', 'channel_name', 'order_name', 'platform', 'tags',
             'spm', 'budget', 'total_views', 'shown_views', 'remaining_views', 'clicks',
             'completed', 'cancelled', 'is_active', 'refund_amount',
             'max_views_per_user', 'created_at', 'updated_at'
@@ -222,6 +224,7 @@ class SearchResultSerializer(serializers.Serializer):
     channel_id = serializers.CharField()
     channel_name = serializers.CharField()
     order_id = serializers.UUIDField()
+    platform = serializers.CharField()
 
 
 class SearchRequestSerializer(serializers.Serializer):

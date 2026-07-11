@@ -50,7 +50,7 @@ class ChatAdOrderSerializer(serializers.ModelSerializer):
         model = ChatAdOrder
         fields = [
             'order_id', 'user_id', 'order_name', 'text', 'link', 'channels',
-            'media_url', 'spm', 'budget',  'total_views', 'clicks',
+            'platform', 'media_url', 'spm', 'budget',  'total_views', 'clicks',
             'max_views_per_user', 'shown_views', 'remaining_views',
             'refund_amount', 'completed', 'cancelled', 'is_active', 'created_at',
             'media_id'
@@ -244,7 +244,7 @@ class ChatAdSearchSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatAdOrder
         fields = [
-            'order_id', 'order_name', 'text', 'link',
+            'order_id', 'order_name', 'text', 'link', 'platform',
             'media_url', 'media_type', 'total_views',
             'clicks', 'shown_views', 'remaining_views'
         ]

@@ -270,6 +270,7 @@ class SearchChannelsView(generics.GenericAPIView):
                     'channel_id': order.channel_id.channel_id,
                     'channel_name': order.channel_id.channel_name,
                     'order_id': order.order_id,
+                    'platform': order.platform
                 }
 
         return None

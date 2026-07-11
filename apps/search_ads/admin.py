@@ -29,7 +29,7 @@ class OrderAdmin(admin.ModelAdmin):
     list_display = ('order_name', 'channel_name', 'user__username', 'spm', 'budget', 'total_views',
                     'shown_views', 'completed', 'is_active')
     ordering = ('-is_active', '-created_at', 'spm')
-    search_fields = ('order_name', 'channel_name', 'user__username')
+    search_fields = ('order_name', 'channel_name', 'user__username', 'platform')
     readonly_fields = ('created_at', 'updated_at')
     search_help_text = 'ORDER_NAME ni, CHANNEL_NAME ni yoki USERNAME ni kiritng'
     list_per_page = 30
