@@ -57,7 +57,14 @@ services:
   celery_worker:
     build: .
     container_name: channel_worker
-    command: celery -A core worker -l info
+    # concurrency ограничиваем явно: без него celery берёт пул на число ядер хоста,
+    # а на многоконтейнерном сервере это выбивает лимит file descriptors (EMFILE).
+    # Двух воркеров хватает для конвертации медиа и чистки. nofile — страховка сверху.
+    command: celery -A core worker -l info --concurrency=2
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
     volumes:
       - media_volume:/app/media # ОБЯЗАТЕЛЬНО: воркер должен видеть файлы, чтобы удалить их
     env_file:
