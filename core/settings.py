@@ -237,3 +237,7 @@ CELERY_TIMEZONE = 'Asia/Tashkent'
 # 0.5 = 50% (остальное забирает платформа). Можно переопределить на конкретном
 # канале через поле ChannelEarning.share_rate. Строкой — чтобы Decimal был точным.
 PARTNER_SHARE_RATE = os.getenv('PARTNER_SHARE_RATE', '0.5')
+
+# Серверный API-ключ для доступа к показу/клику рекламы (server-to-server с NovaGram).
+# Пусто → доступ к этим эндпоинтам закрыт (fail-closed). Секрет — в .env.
+AD_SERVER_API_KEY = os.getenv('AD_SERVER_API_KEY')

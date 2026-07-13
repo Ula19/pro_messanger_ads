@@ -8,6 +8,7 @@ from django.db import transaction
 from rest_framework.views import APIView
 
 from apps.common.pagination import StandardResultsSetPagination
+from apps.common.permissions import HasServerApiKey
 
 from .models import Order, Tag, AdView
 from .serializers import (CreateChannelOrderSerializer, ResponsesMessageSerializer, OrderDetailSerializer,
@@ -209,7 +210,7 @@ class ActiveOrderListView(generics.ListAPIView):
 class SearchChannelsView(generics.GenericAPIView):
     """Поиск каналов по тегу с учетом лимита показов на пользователя"""
     serializer_class = SearchRequestSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
 
     @extend_schema(request=SearchRequestSerializer, responses=SearchResultSerializer)
     def post(self, request):
@@ -324,7 +325,7 @@ class ClickView(APIView):
     """
     Увеличивает счетчик кликов у объявления.
     """
-    permission_classes = [permissions.AllowAny]  # Кликать может любой
+    permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
     serializer_class = ClickOrderSerializer
 
     @extend_schema(request=ClickOrderSerializer, responses=ResponsesMessageSerializer)

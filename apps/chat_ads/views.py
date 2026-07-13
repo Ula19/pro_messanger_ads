@@ -9,6 +9,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 
 from apps.common.pagination import StandardResultsSetPagination
+from apps.common.permissions import HasServerApiKey
 
 from apps.billing.models import Balance
 from apps.partner.models import ChannelEarning
@@ -196,7 +197,7 @@ class GetChatAdView(APIView):
     Body: {"channel_name": "news_channel", "viewer_id": "user_123"}
     """
     serializer_class = AdRequestSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
 
     @extend_schema(request=AdRequestSerializer, responses=ChatAdSearchSerializer)
     def post(self, request):
@@ -291,7 +292,7 @@ class ChatAdClickView(APIView):
     """
     Увеличивает счетчик кликов у объявления.
     """
-    permission_classes = [permissions.AllowAny]  # Кликать может любой
+    permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
     serializer_class = ChatAdClickOrderSerializer
 
     @extend_schema(request=ChatAdClickOrderSerializer, responses=ChatAdResponsesMessageSerializer)
