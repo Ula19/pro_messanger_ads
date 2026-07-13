@@ -101,6 +101,11 @@ DATABASES = {
         'PASSWORD': os.getenv('DATABASES_PASSWORD'),
         'HOST': os.getenv('DATABASES_HOST', 'localhost'),
         'PORT': os.getenv('DATABASES_PORT', '5432'),
+        # Переиспользуем соединение до 60с вместо open/close на каждый запрос
+        # (меньше latency и нагрузки на Postgres при высоком RPS).
+        'CONN_MAX_AGE': 60,
+        # Проверяем живость переиспользуемого соединения перед запросом.
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 # Custom User Model

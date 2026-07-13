@@ -198,6 +198,7 @@ class GetChatAdView(APIView):
     """
     serializer_class = AdRequestSerializer
     permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
+    throttle_classes = []  # доверенный сервер (server-to-server), глобальный троттл 500/min тут не нужен
 
     @extend_schema(request=AdRequestSerializer, responses=ChatAdSearchSerializer)
     def post(self, request):
@@ -242,44 +243,40 @@ class GetChatAdView(APIView):
                 if order.max_views_per_user == 0:
                     continue
 
-            # 3.3 Попытка списания просмотра (Concurrency safe)
-            # Если мы дошли сюда, значит реклама подходит. Нужно заблокировать строку и списать просмотр.
+            # 3.3 Списание показа — атомарным условным UPDATE, без блокирующего
+            # select_for_update. WHERE-условие само отсекает гонку: одновременно
+            # пройдёт ровно один запрос, лишние получат 0 обновлённых строк.
             with transaction.atomic():
-                # Блокируем заказ для записи (защита от race condition)
-                try:
-                    locked_order = ChatAdOrder.objects.select_for_update(nowait=False).get(pk=order.pk)
-                except ChatAdOrder.DoesNotExist:
-                    continue  # Если заказ удалили за миллисекунду
+                updated = ChatAdOrder.objects.filter(
+                    pk=order.pk, remaining_views__gt=0, is_active=True, cancelled=False
+                ).update(
+                    remaining_views=F('remaining_views') - 1,
+                    shown_views=F('shown_views') + 1,
+                )
+                if not updated:
+                    continue  # показы кончились или кто-то успел раньше — к следующему заказу
 
-                # Проверяем оставшиеся просмотры еще раз (вдруг списали в параллельном потоке)
-                if locked_order.remaining_views <= 0 or not locked_order.is_active:
-                    continue
+                # Показы исчерпаны -> помечаем заказ завершённым (точечный дешёвый апдейт).
+                ChatAdOrder.objects.filter(pk=order.pk, remaining_views=0).update(
+                    completed=True, is_active=False
+                )
 
-                # --- ЛОГИКА ЗАПИСИ ПРОСМОТРА ---
+                # Начисляем заработок каналу-площадке за этот показ. Строка заказа залочена
+                # этим UPDATE до commit, поэтому параллельные показы ЭТОГО же заказа
+                # сериализуются — счётчик показов юзера ниже безопасен.
+                ChannelEarning.accrue(channel_id, order, channel_name=channel_name)
 
-                # 1. Списываем глобальный просмотр (бюджет)
-                locked_order.decrement_views()
-
-                # 1.1 Начисляем заработок каналу-площадке за этот показ (50% от цены показа).
-                # Ключ — числовой channel_id; имя передаём как метку. В той же транзакции —
-                # деньги площадки и списание просмотра атомарны вместе.
-                ChannelEarning.accrue(channel_id, locked_order, channel_name=channel_name)
-
-                # 2. Логика сохранения истории просмотра (Требование пользователя)
-                if locked_order.max_views_per_user != -1:
-                    # Если лимит не -1, мы ОБЯЗАНЫ сохранять/обновлять счетчик юзера
-                    view_obj, created = ChatAdView.objects.get_or_create(
-                        order=locked_order,
-                        viewer_id=viewer_id
+                # История показов на пользователя — только при заданном лимите (иначе -1: не пишем).
+                if order.max_views_per_user != -1:
+                    view_obj, _ = ChatAdView.objects.get_or_create(
+                        order=order, viewer_id=viewer_id
                     )
                     view_obj.increment_view()
 
-                # Если -1, мы просто списали remaining_views и ничего не пишем в ChatAdView.
-                # Это экономит место в БД, как и требовалось.
-
-                # 4. Возвращаем рекламу
-                response_serializer = ChatAdSearchSerializer(locked_order)
-                return Response(response_serializer.data, status=status.HTTP_200_OK)
+                # Отдаём рекламу. В БД показ уже списан; счётчики в объекте правим в памяти.
+                order.remaining_views -= 1
+                order.shown_views += 1
+                return Response(ChatAdSearchSerializer(order).data, status=status.HTTP_200_OK)
 
         # Если цикл прошел и ничего не вернул
         return Response(
@@ -293,6 +290,7 @@ class ChatAdClickView(APIView):
     Увеличивает счетчик кликов у объявления.
     """
     permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
+    throttle_classes = []  # доверенный сервер, глобальный троттл тут не нужен
     serializer_class = ChatAdClickOrderSerializer
 
     @extend_schema(request=ChatAdClickOrderSerializer, responses=ChatAdResponsesMessageSerializer)

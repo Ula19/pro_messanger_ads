@@ -211,6 +211,7 @@ class SearchChannelsView(generics.GenericAPIView):
     """Поиск каналов по тегу с учетом лимита показов на пользователя"""
     serializer_class = SearchRequestSerializer
     permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
+    throttle_classes = []  # доверенный сервер (server-to-server), глобальный троттл 500/min тут не нужен
 
     @extend_schema(request=SearchRequestSerializer, responses=SearchResultSerializer)
     def post(self, request):
@@ -277,43 +278,44 @@ class SearchChannelsView(generics.GenericAPIView):
         return None
 
     def _try_show_ad_to_user(self, order, viewer_id):
-        """Пытается показать рекламу пользователю"""
+        """
+        Пытается показать рекламу пользователю (атомарно, без блокировки всего заказа).
+
+        Лок берём только на строку показа пары «заказ+зритель» (низкая конкуренция) —
+        этого хватает, чтобы лимит показов на пользователя не гонялся. Бюджет заказа
+        списываем условным UPDATE: WHERE отсекает гонку, лок на строку заказа держится
+        доли мс, поэтому популярная реклама не выстраивает всех в очередь.
+        """
         try:
             with transaction.atomic():
-                # Блокируем заказ для безопасного обновления
-                order_lock = Order.objects.select_for_update().get(order_id=order.order_id)
+                ad_view, _ = AdView.objects.get_or_create(
+                    order=order, viewer_id=viewer_id, defaults={'view_count': 0}
+                )
+                ad_view = AdView.objects.select_for_update().get(pk=ad_view.pk)
 
-                # Проверяем, можно ли показывать заказ
-                if (order_lock.remaining_views <= 0 or
-                        order_lock.cancelled or
-                        not order_lock.is_active):
+                # Лимит показов на пользователя — не тратим бюджет, если он уже исчерпан.
+                if ad_view.view_count >= order.max_views_per_user:
                     return False
 
-                # Получаем или создаем запись о просмотрах пользователя
-                ad_view, created = AdView.objects.get_or_create(
-                    order=order_lock,
-                    viewer_id=viewer_id,
-                    defaults={'view_count': 0}
+                # Атомарно списываем один показ из бюджета (условие в WHERE — защита от гонки).
+                updated = Order.objects.filter(
+                    order_id=order.order_id, remaining_views__gt=0,
+                    is_active=True, cancelled=False
+                ).update(
+                    remaining_views=F('remaining_views') - 1,
+                    shown_views=F('shown_views') + 1,
+                )
+                if not updated:
+                    return False  # бюджет кончился или заказ выключили/отменили
+
+                # Показы исчерпаны -> помечаем заказ завершённым (точечный дешёвый апдейт).
+                Order.objects.filter(order_id=order.order_id, remaining_views=0).update(
+                    completed=True, is_active=False
                 )
 
-                # Проверяем лимит показов для пользователя
-                if ad_view.view_count >= order_lock.max_views_per_user:
-                    return False  # Лимит исчерпан
-
-                # Обновляем счетчики заказа
-                order_lock.shown_views += 1
-                order_lock.remaining_views -= 1
-
-                if order_lock.remaining_views == 0:
-                    order_lock.completed = True
-                    order_lock.is_active = False
-
-                order_lock.save()
-
-                # Обновляем счетчик просмотров пользователя
+                # Фиксируем показ этому пользователю.
                 ad_view.view_count += 1
-                ad_view.save()
-
+                ad_view.save(update_fields=['view_count', 'last_viewed_at'])
                 return True
 
         except Exception as e:
@@ -326,6 +328,7 @@ class ClickView(APIView):
     Увеличивает счетчик кликов у объявления.
     """
     permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
+    throttle_classes = []  # доверенный сервер, глобальный троттл тут не нужен
     serializer_class = ClickOrderSerializer
 
     @extend_schema(request=ClickOrderSerializer, responses=ResponsesMessageSerializer)

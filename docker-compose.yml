@@ -33,7 +33,7 @@ services:
         sleep 5 &&
         python manage.py migrate &&
         python manage.py collectstatic --noinput &&
-        gunicorn --bind 0.0.0.0:9000 --workers 3 core.wsgi:application
+        gunicorn --bind 0.0.0.0:9000 --worker-class gthread --workers 4 --threads 8 --timeout 60 core.wsgi:application
       "
     volumes:
       - static_volume:/app/staticfiles
