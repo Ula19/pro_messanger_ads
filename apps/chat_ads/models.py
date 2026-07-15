@@ -9,6 +9,8 @@ from django.conf import settings
 from django.core.validators import MinValueValidator, FileExtensionValidator
 from django.db import models, transaction
 
+from apps.common.models import ModerationMixin, ModerationStatus
+
 logger = logging.getLogger(__name__)
 
 
@@ -118,7 +120,7 @@ class ChatAdMedia(models.Model):
         return f"{self.media_type} by {self.user.username} ({self.id})"
 
 
-class ChatAdOrder(models.Model):
+class ChatAdOrder(ModerationMixin):
     """Модель рекламы для чатов каналов"""
 
     class Platform(models.TextChoices):
@@ -185,8 +187,9 @@ class ChatAdOrder(models.Model):
                                     help_text='Реклама завершена (просмотры израсходованы)')
     cancelled = models.BooleanField(verbose_name='Отменено', default=False,
                                     help_text='Реклама отменена пользователем')
-    is_active = models.BooleanField(verbose_name='Активно', default=True,
-                                    help_text='Реклама активна и показывается')
+    is_active = models.BooleanField(verbose_name='Активно', default=False,
+                                    help_text='Реклама активна и показывается. '
+                                              'Включается только после одобрения модератором')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -233,6 +236,12 @@ class ChatAdOrder(models.Model):
             self.total_views = self.calculate_views_from_budget()
             self.remaining_views = self.total_views
 
+        # Новый заказ всегда уходит на модерацию и не показывается,
+        # какие бы значения ни пришли снаружи. Включить его может только approve().
+        if is_new:
+            self.status = ModerationStatus.PENDING
+            self.is_active = False
+
         super().save(*args, **kwargs)
 
     def decrement_views(self, amount=1):
@@ -257,29 +266,20 @@ class ChatAdOrder(models.Model):
 
     def cancel_order(self):
         """Отменяет заказ и возвращает средства за оставшиеся показы"""
+        # По отклонённому/заблокированному заказу деньги уже вернули при модерации
+        if self.status in (ModerationStatus.REJECTED, ModerationStatus.BLOCKED):
+            return 0
+
         if not self.cancelled:
             self.cancelled = True
             self.is_active = False
             self.completed = False
 
-            # Рассчитываем сумму для возврата
-            refund_amount = (Decimal(self.remaining_views) / Decimal(1000)) * self.spm
-
-            # Возвращаем средства на баланс пользователя
-            balance = self.user.balance
-            balance.deposit(refund_amount)
-
-            # Сбрасываем оставшиеся показы
-            self.remaining_views = 0
+            # Возврат считает общий метод миксина (он же обнуляет remaining_views)
+            refund_amount = self._refund_unspent()
 
             self.save()
             return refund_amount
-        return 0
-
-    def get_refund_amount(self):
-        """Рассчитывает сумму возврата при отмене"""
-        if self.remaining_views > 0:
-            return (Decimal(self.remaining_views) / Decimal(1000)) * self.spm
         return 0
 
 
