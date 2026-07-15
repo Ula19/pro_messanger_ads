@@ -22,3 +22,21 @@ class HasServerApiKey(permissions.BasePermission):
         if not provided:
             return False
         return constant_time_compare(provided, expected)
+
+
+class IsModerator(permissions.BasePermission):
+    """Пускает только модераторов и суперадмина (проверка модерации рекламы)."""
+    message = 'Требуются права модератора.'
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and user.is_moderator)
+
+
+class IsSuperAdmin(permissions.BasePermission):
+    """Пускает только суперадмина (создаётся через createsuperuser)."""
+    message = 'Требуются права суперадмина.'
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and user.is_superuser)
