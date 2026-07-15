@@ -6,8 +6,17 @@ from django.db import models
 
 class CustomUser(AbstractUser):
     """Кастомная модель пользователя с UUID"""
+
+    class Role(models.TextChoices):
+        ADVERTISER = 'ADVERTISER', 'Рекламодатель'  # обычный пользователь, покупает рекламу
+        MODERATOR = 'MODERATOR', 'Модератор'        # проверяет рекламу, одобряет/отклоняет
+
     user_id = models.UUIDField(verbose_name='User ID', default=uuid.uuid4, editable=False, unique=True)
-    is_admin = models.BooleanField(default=False)
+    role = models.CharField(
+        verbose_name='Роль', max_length=20,
+        choices=Role.choices, default=Role.ADVERTISER,
+        help_text='Роль назначает суперадмин. Каждый новый пользователь — рекламодатель',
+    )
     # Числовой id пользователя в Telegram. Клиент (NovaGram) знает его, так как
     # залогинен под этим пользователем; используется для привязки/claim каналов.
     telegram_id = models.BigIntegerField(
@@ -21,3 +30,8 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return f"{self.username} ({self.user_id})"
+
+    @property
+    def is_moderator(self):
+        """Может ли пользователь модерировать рекламу (модератор или суперадмин)"""
+        return self.is_superuser or self.role == self.Role.MODERATOR

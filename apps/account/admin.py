@@ -6,7 +6,8 @@ from apps.account.models import CustomUser
 
 @admin.register(CustomUser)
 class UserAdmin(UserAdmin):
-    list_display = ('username', 'user_id', 'telegram_id', 'is_admin')
+    list_display = ('username', 'user_id', 'telegram_id', 'role')
+    list_filter = ('role', 'is_superuser', 'is_active')
     search_fields = ('username', 'user_id', 'telegram_id')
     list_per_page = 20
     search_help_text = 'USERNAME ni yoki USER ID ni kiritng'
@@ -15,7 +16,7 @@ class UserAdmin(UserAdmin):
         (None, {'fields': ('username', 'password')}),
         ('Personal info', {'fields': ('first_name', 'last_name', 'email', 'telegram_id')}),
         ('Permissions', {
-            'fields': ('is_active', 'is_staff', 'is_superuser', 'is_admin', 'groups', 'user_permissions'),
+            'fields': ('is_active', 'is_staff', 'is_superuser', 'role', 'groups', 'user_permissions'),
         }),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
@@ -24,6 +25,6 @@ class UserAdmin(UserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('username', 'email', 'password1', 'password2', 'is_admin', 'is_staff', 'is_active'),
+            'fields': ('username', 'email', 'password1', 'password2', 'role', 'is_staff', 'is_active'),
         }),
     )

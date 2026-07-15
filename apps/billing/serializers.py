@@ -18,23 +18,8 @@ class BalanceSerializer(serializers.ModelSerializer):
         read_only_fields = ['user', 'username', 'user_id']
 
 
-class DepositSerializer(serializers.Serializer):
-    """Сериализатор для пополнения баланса"""
-    amount = serializers.DecimalField(
-        max_digits=15,
-        decimal_places=2,
-        required=True,
-        min_value=Decimal('0.01')
-    )
-
-    def validate(self, data):
-        if data['amount'] <= 0:
-            raise serializers.ValidationError({"amount": "Сумма должна быть больше 0"})
-        return data
-
-
 class AdminDepositSerializer(serializers.Serializer):
-    """Сериализатор для пополнения баланса администратором"""
+    """Сериализатор для пополнения баланса суперадмином"""
     user_id = serializers.UUIDField(required=True, help_text='UUID пользователя')
     amount = serializers.DecimalField(
         max_digits=15,

@@ -2,8 +2,9 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 
+from apps.common.permissions import IsSuperAdmin
 from apps.billing.models import Balance
-from apps.billing.serializers import BalanceSerializer, DepositSerializer, AdminDepositSerializer
+from apps.billing.serializers import BalanceSerializer, AdminDepositSerializer
 
 
 User = get_user_model()
@@ -20,49 +21,18 @@ class BalanceView(generics.RetrieveAPIView):
         return balance
 
 
-class DepositView(generics.GenericAPIView):
-    """Пополнение баланса"""
-    serializer_class = DepositSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        amount = serializer.validated_data['amount']
-        user = request.user
-
-        # Получаем или создаем баланс
-        balance, created = Balance.objects.get_or_create(user=user)
-
-        # Пополняем баланс
-        balance.deposit(amount)
-
-        return Response({
-            'message': f'Баланс успешно пополнен на {amount}',
-            'new_balance': balance.amount
-        }, status=status.HTTP_200_OK)
-
-
 class AdminDepositView(generics.GenericAPIView):
     """
-    Пополнение баланса пользователя администратором.
-    Только пользователи с is_admin=True могут использовать этот эндпоинт.
+    Пополнение баланса пользователя.
+    Доступно только суперадмину — больше никто пополнять балансы не вправе.
     """
     serializer_class = AdminDepositSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsSuperAdmin]
 
     def post(self, request):
         """
         Пополняет баланс указанного пользователя
         """
-        # Проверяем, является ли текущий пользователь администратором
-        if not request.user.is_admin:
-            return Response(
-                {'error': 'У вас нет прав для выполнения этой операции'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
