@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.db import models
+from django.db.models import F
 from django.conf import settings
 from django.core.validators import MinValueValidator
 
@@ -42,9 +43,17 @@ class Balance(models.Model):
         return f"{self.user.username}: {self.amount}"
 
     def deposit(self, amount):
-        """Пополнение баланса"""
-        self.amount += Decimal(amount)
-        self.save()
+        """
+        Пополнение баланса.
+
+        Прибавляем через F-выражение — плюсует сама база данных атомарно.
+        Иначе два одновременных зачисления (например, возврат за заказ и
+        пополнение админом) могли бы затереть друг друга.
+        """
+        self.amount = F('amount') + Decimal(amount)
+        self.save(update_fields=['amount', 'updated_at'])
+        # Перечитываем значение из базы, чтобы в объекте осталось число, а не F-выражение
+        self.refresh_from_db(fields=['amount'])
 
     def withdraw(self, amount):
         """Списание с баланса (с проверкой)"""
