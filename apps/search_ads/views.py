@@ -7,6 +7,7 @@ from django.http import Http404
 from django.db import transaction
 from rest_framework.views import APIView
 
+from apps.common.models import ModerationStatus
 from apps.common.pagination import StandardResultsSetPagination
 from apps.common.permissions import HasServerApiKey
 
@@ -53,6 +54,9 @@ class CancelOrderView(generics.GenericAPIView):
                     return Response({'error': 'Заказ уже отменен.'}, status=400)
                 if order.completed:
                     return Response({'error': 'Нельзя отменить завершенный заказ.'}, status=400)
+                # По отклонённому/заблокированному заказу деньги уже вернули при модерации
+                if order.status in (ModerationStatus.REJECTED, ModerationStatus.BLOCKED):
+                    return Response({'error': 'Заказ отклонён или заблокирован, средства уже возвращены.'}, status=400)
 
                 order.cancel_order() # Метод модели
 
@@ -156,6 +160,13 @@ class OrderActivationView(generics.GenericAPIView):
             # Блокируем заказ для предотвращения race conditions
             locked_order = Order.objects.select_for_update().get(order_id=order.order_id)
 
+            # Повторная проверка под локом: пока запрос шёл, модератор мог
+            # заблокировать заказ — не даём юзеру реанимировать его
+            if locked_order.status != ModerationStatus.APPROVED or locked_order.cancelled or locked_order.completed:
+                return Response({
+                    'error': 'Заказ нельзя включить/выключить: он не одобрен, отменён или завершён'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
             # Сохраняем старый статус
             old_status = locked_order.is_active
 
@@ -252,9 +263,10 @@ class SearchChannelsView(generics.GenericAPIView):
             return None
 
     def _get_sorted_orders_by_tag(self, tag_obj):
-        """Получает активные заказы с тегом, отсортированные по SPM"""
+        """Получает активные одобренные заказы с тегом, отсортированные по SPM"""
         return Order.objects.filter(
             tags=tag_obj,
+            status=ModerationStatus.APPROVED,  # показываем только прошедшее модерацию
             is_active=True,
             cancelled=False,
             remaining_views__gt=0
@@ -300,6 +312,7 @@ class SearchChannelsView(generics.GenericAPIView):
                 # Атомарно списываем один показ из бюджета (условие в WHERE — защита от гонки).
                 updated = Order.objects.filter(
                     order_id=order.order_id, remaining_views__gt=0,
+                    status=ModerationStatus.APPROVED,
                     is_active=True, cancelled=False
                 ).update(
                     remaining_views=F('remaining_views') - 1,

@@ -4,6 +4,8 @@ from decimal import Decimal
 from django.db import transaction
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+
+from apps.common.models import ModerationStatus
 from .models import ChatAdOrder, ChatAdView, ChatAdMedia
 
 
@@ -52,13 +54,15 @@ class ChatAdOrderSerializer(serializers.ModelSerializer):
             'order_id', 'user_id', 'order_name', 'text', 'link', 'channels',
             'platform', 'media_url', 'spm', 'budget',  'total_views', 'clicks',
             'max_views_per_user', 'shown_views', 'remaining_views',
-            'refund_amount', 'completed', 'cancelled', 'is_active', 'created_at',
-            'media_id'
+            'refund_amount', 'completed', 'cancelled', 'is_active',
+            'status', 'reject_reason', 'created_at', 'media_id'
         ]
         read_only_fields = [
             'order_id', 'user_id', 'total_views', 'clicks',
             'shown_views', 'refund_amount', 'remaining_views', 'media_url',
-            'completed', 'cancelled',  'created_at'
+            'completed', 'cancelled', 'created_at',
+            # is_active клиент не задаёт: заказ включается только после одобрения модератором
+            'is_active', 'status', 'reject_reason',
         ]
 
     @extend_schema_field(serializers.CharField())
@@ -163,6 +167,12 @@ class ChatAdOrderActivationSerializer(serializers.Serializer):
         order = attrs['order_id']  # Здесь уже объект модели
         new_is_active = attrs['is_active']
 
+        # 0. Включать/выключать можно только заказ, прошедший модерацию
+        if order.status != ModerationStatus.APPROVED:
+            raise serializers.ValidationError(
+                f"Заказ не прошёл модерацию (статус: {order.get_status_display()}) — менять активность нельзя."
+            )
+
         # 1. Если заказ отменен или завершен — менять статус нельзя
         if order.cancelled:
             raise serializers.ValidationError("Невозможно активировать отмененный заказ.")
@@ -200,6 +210,13 @@ class ChatAdOrderActivationSerializer(serializers.Serializer):
             # Блокируем строку в БД (select_for_update)
             # Нужно перезапросить объект по ID, чтобы наложить блокировку
             locked_order = ChatAdOrder.objects.select_for_update().get(pk=order_instance.pk)
+
+            # Повторная проверка под локом: пока запрос шёл, модератор мог
+            # заблокировать заказ — не даём юзеру реанимировать его
+            if locked_order.status != ModerationStatus.APPROVED or locked_order.cancelled or locked_order.completed:
+                raise serializers.ValidationError(
+                    "Заказ нельзя включить/выключить: он не одобрен, отменён или завершён."
+                )
 
             # Повторная проверка внутри транзакции (на случай параллельных запросов)
             if new_is_active and locked_order.remaining_views <= 0:

@@ -3,6 +3,7 @@ from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 
 from apps.billing.models import Balance
+from apps.common.models import ModerationStatus
 from apps.search_ads.models import Channel, Order, Tag
 
 
@@ -21,7 +22,8 @@ class CreateChannelOrderSerializer(serializers.Serializer):
     spm = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
     budget = serializers.DecimalField(max_digits=15, decimal_places=2, required=True)
     max_views_per_user = serializers.IntegerField(default=1)
-    is_active = serializers.BooleanField(default=True)
+    # is_active от клиента не принимаем: новый заказ всегда уходит на модерацию
+    # и включается только после одобрения модератором
 
     def validate(self, data):
         if data['spm'] <= 0:
@@ -62,7 +64,7 @@ class CreateChannelOrderSerializer(serializers.Serializer):
             if tag_names:
                 channel.add_tags(tag_names)
 
-            # 4. Создаем заказ
+            # 4. Создаем заказ (статус PENDING и is_active=False выставит Order.save())
             order = Order.objects.create(
                 channel_id=channel,
                 user=user,
@@ -71,7 +73,6 @@ class CreateChannelOrderSerializer(serializers.Serializer):
                 platform=validated_data['platform'],
                 spm=validated_data['spm'],
                 budget=validated_data['budget'],
-                is_active=validated_data['is_active'],
                 max_views_per_user=validated_data['max_views_per_user'],
             )
 
@@ -119,7 +120,7 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         fields = [
             'order_id', 'channel_id', 'channel_name', 'order_name', 'platform', 'tags',
             'spm', 'budget', 'total_views', 'shown_views', 'remaining_views', 'clicks',
-            'completed', 'cancelled', 'is_active', 'refund_amount',
+            'completed', 'cancelled', 'is_active', 'status', 'reject_reason', 'refund_amount',
             'max_views_per_user', 'created_at', 'updated_at'
         ]
         read_only_fields = fields
@@ -186,6 +187,11 @@ class OrderActivationSerializer(serializers.Serializer):
         Проверка возможности изменения статуса заказа
         """
         errors = {}
+
+        # Включать/выключать можно только заказ, прошедший модерацию
+        if order.status != ModerationStatus.APPROVED:
+            errors['error'] = f"Заказ не прошёл модерацию (статус: {order.get_status_display()}) — менять активность нельзя"
+            return errors
 
         # Проверяем, не отменен ли заказ
         if order.cancelled:

@@ -8,6 +8,7 @@ from django.db import transaction
 from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 
+from apps.common.models import ModerationStatus
 from apps.common.pagination import StandardResultsSetPagination
 from apps.common.permissions import HasServerApiKey
 
@@ -69,7 +70,7 @@ class ChatAdOrderCreateView(generics.CreateAPIView):
         """
         response = super().create(request, *args, **kwargs)
 
-        response_data = {'message': 'Ордер успешна создан'}
+        response_data = {'message': 'Ордер создан и отправлен на модерацию'}
         response_serializer = ChatAdResponsesMessageSerializer(data=response_data)
         response_serializer.is_valid(raise_exception=True)
 
@@ -161,6 +162,9 @@ class ChatAdCancelOrderView(generics.GenericAPIView):
             return 'Заказ уже отменен.'
         if order.completed:
             return 'Нельзя отменить завершенный заказ.'
+        # По отклонённому/заблокированному заказу деньги уже вернули при модерации
+        if order.status in (ModerationStatus.REJECTED, ModerationStatus.BLOCKED):
+            return 'Заказ отклонён или заблокирован, средства уже возвращены.'
         return None
 
 
@@ -215,6 +219,7 @@ class GetChatAdView(APIView):
         # Сортируем по SPM (сначала самые дорогие)
         candidates = ChatAdOrder.objects.filter(
             channels__icontains=channel_name,  # Может найти "news" внутри "news_sport", проверим точнее ниже
+            status=ModerationStatus.APPROVED,  # показываем только прошедшее модерацию
             is_active=True,
             completed=False,
             cancelled=False,
@@ -248,7 +253,9 @@ class GetChatAdView(APIView):
             # пройдёт ровно один запрос, лишние получат 0 обновлённых строк.
             with transaction.atomic():
                 updated = ChatAdOrder.objects.filter(
-                    pk=order.pk, remaining_views__gt=0, is_active=True, cancelled=False
+                    pk=order.pk, remaining_views__gt=0,
+                    status=ModerationStatus.APPROVED,
+                    is_active=True, cancelled=False
                 ).update(
                     remaining_views=F('remaining_views') - 1,
                     shown_views=F('shown_views') + 1,
