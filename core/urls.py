@@ -29,6 +29,7 @@ urlpatterns = [
     path('api/search_ads/', include('apps.search_ads.urls')),
     path('api/chat_ads/', include('apps.chat_ads.urls')),
     path('api/partner/', include('apps.partner.urls')),
+    path('api/moderation/', include('apps.moderation.urls')),
 ]
 
 if settings.DEBUG:
