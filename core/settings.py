@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'apps.billing',
     'apps.partner',
     'apps.moderation',
+    'apps.announcements',
 ]
 
 MIDDLEWARE = [
