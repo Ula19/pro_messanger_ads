@@ -271,8 +271,12 @@ class ChatAdSearchSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.URLField(allow_null=True))
     def get_media_url(self, obj):
-        # Если есть привязанный медиа-файл, возвращаем его полный URL
+        # Если есть привязанный медиа-файл, возвращаем его ПОЛНЫЙ URL
+        # (как в ChatAdOrderSerializer — клиенту нужен абсолютный адрес)
         if obj.media_url and obj.media_url.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.media_url.file.url)
             return obj.media_url.file.url
         return None
 

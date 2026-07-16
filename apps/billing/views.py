@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
@@ -29,9 +30,34 @@ class AdminDepositView(generics.GenericAPIView):
     serializer_class = AdminDepositSerializer
     permission_classes = [IsSuperAdmin]
 
+    @extend_schema(request=AdminDepositSerializer, responses={
+        200: {
+            'type': 'object',
+            'properties': {
+                'message': {'type': 'string'},
+                'user_info': {
+                    'type': 'object',
+                    'properties': {
+                        'user_id': {'type': 'string', 'format': 'uuid'},
+                        'username': {'type': 'string'},
+                        'email': {'type': 'string'},
+                    },
+                },
+                'balance_info': {
+                    'type': 'object',
+                    'properties': {
+                        'old_balance': {'type': 'string', 'format': 'decimal'},
+                        'new_balance': {'type': 'string', 'format': 'decimal'},
+                        'added_amount': {'type': 'string', 'format': 'decimal'},
+                    },
+                },
+            },
+        },
+    })
     def post(self, request):
         """
-        Пополняет баланс указанного пользователя
+        Пополняет баланс указанного пользователя.
+        Доступно только суперадмину — больше никто пополнять балансы не вправе.
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -53,8 +79,9 @@ class AdminDepositView(generics.GenericAPIView):
                 'email': user.email
             },
             'balance_info': {
-                'old_balance': balance.amount - amount,
-                'new_balance': balance.amount,
-                'added_amount': amount
+                # строками — как amount в /api/balance/ (Decimal в JSON иначе стал бы float)
+                'old_balance': str(balance.amount - amount),
+                'new_balance': str(balance.amount),
+                'added_amount': str(amount)
             }
         }, status=status.HTTP_200_OK)

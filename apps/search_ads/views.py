@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from apps.common.models import ModerationStatus
 from apps.common.pagination import StandardResultsSetPagination
 from apps.common.permissions import HasServerApiKey
+from apps.common.schema import ERROR_RESPONSE, SERVER_API_KEY_AUTH
 
 from .models import Order, Tag, AdView
 from .serializers import (CreateChannelOrderSerializer, ResponsesMessageSerializer, OrderDetailSerializer,
@@ -43,7 +44,11 @@ class CancelOrderView(generics.GenericAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ResponsesMessageSerializer
 
-    @extend_schema(request=None, responses=ResponsesMessageSerializer)
+    @extend_schema(request=None, responses={
+        200: ResponsesMessageSerializer,
+        400: ERROR_RESPONSE,  # уже отменён / завершён / отклонён-заблокирован (деньги вернули)
+        404: ERROR_RESPONSE,  # не найден или чужой заказ
+    })
     def post(self, request, order_id):
         try:
             with transaction.atomic():
@@ -85,7 +90,7 @@ class OrderListView(generics.ListAPIView):
 class OrderDetailView(generics.RetrieveAPIView):
     """
     Получение детальной информации о заказе.
-    GET /api/orders/{order_id}/detail/
+    GET /api/search_ads/order/{order_id}/detail/
     """
     serializer_class = OrderDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -113,6 +118,7 @@ class OrderDetailView(generics.RetrieveAPIView):
             # Возвращаем 404 с понятным сообщением
             raise Http404("Заказ не найден или у вас нет прав на его просмотр")
 
+    @extend_schema(responses={200: OrderDetailSerializer, 404: ERROR_RESPONSE})
     def retrieve(self, request, *args, **kwargs):
         """
         Переопределяем для кастомизации ответа при ошибке
@@ -134,7 +140,20 @@ class OrderActivationView(generics.GenericAPIView):
     serializer_class = OrderActivationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    @extend_schema(request=OrderActivationSerializer, responses=ResponsesMessageSerializer)
+    @extend_schema(request=OrderActivationSerializer, responses={
+        200: {
+            'type': 'object',
+            'properties': {
+                'message': {'type': 'string'},
+                # эти три поля приходят только в ветке warning («статус уже такой»)
+                'order_id': {'type': 'string', 'format': 'uuid'},
+                'current_status': {'type': 'boolean'},
+                'requested_status': {'type': 'boolean'},
+            },
+            'required': ['message'],
+        },
+        400: ERROR_RESPONSE,  # не одобрен модерацией / отменён / завершён / нет просмотров
+    })
     def post(self, request):
         """
         Обработка POST запроса для активации/деактивации заказа
@@ -196,7 +215,8 @@ class OrderActivationView(generics.GenericAPIView):
         response_serializer = ResponsesMessageSerializer(data=response_data)
         response_serializer.is_valid(raise_exception=True)
 
-        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+        # 200, а не 201: мы ничего не создаём, только переключаем статус
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
 
 class ActiveOrderListView(generics.ListAPIView):
@@ -219,12 +239,24 @@ class ActiveOrderListView(generics.ListAPIView):
 # =========
 
 class SearchChannelsView(generics.GenericAPIView):
-    """Поиск каналов по тегу с учетом лимита показов на пользователя"""
+    """
+    Поиск рекламы по тегу с учетом лимита показов на пользователя.
+    Успешный ответ — это засчитанный показ: у заказа атомарно списывается
+    один показ (тратится бюджет рекламодателя).
+    Доступ — только по заголовку X-API-Key (server-to-server от NovaGram).
+    """
     serializer_class = SearchRequestSerializer
     permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
     throttle_classes = []  # доверенный сервер (server-to-server), глобальный троттл 500/min тут не нужен
 
-    @extend_schema(request=SearchRequestSerializer, responses=SearchResultSerializer)
+    @extend_schema(request=SearchRequestSerializer, auth=SERVER_API_KEY_AUTH, responses={
+        200: SearchResultSerializer,
+        400: {
+            'type': 'object',
+            'properties': {'error': {'type': 'string'}, 'details': {'type': 'object'}},
+        },
+        404: ERROR_RESPONSE,  # штатный исход: подходящей рекламы нет
+    })
     def post(self, request):
         # 1. Валидация входных данных с помощью SearchRequestSerializer
         request_serializer = SearchRequestSerializer(data=request.data)
@@ -339,12 +371,20 @@ class SearchChannelsView(generics.GenericAPIView):
 class ClickView(APIView):
     """
     Увеличивает счетчик кликов у объявления.
+    Доступ — только по заголовку X-API-Key (server-to-server от NovaGram).
+    400 приходит, если заказ не найден или уже не активен (завершён/выключен).
     """
     permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
     throttle_classes = []  # доверенный сервер, глобальный троттл тут не нужен
     serializer_class = ClickOrderSerializer
 
-    @extend_schema(request=ClickOrderSerializer, responses=ResponsesMessageSerializer)
+    @extend_schema(request=ClickOrderSerializer, auth=SERVER_API_KEY_AUTH, responses={
+        200: ResponsesMessageSerializer,
+        400: {
+            'type': 'object',
+            'properties': {'order_id': {'type': 'array', 'items': {'type': 'string'}}},
+        },
+    })
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)

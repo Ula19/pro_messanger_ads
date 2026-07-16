@@ -101,7 +101,11 @@ class UserRoleUpdateView(generics.GenericAPIView):
                     "user_id": {"type": "string", "format": "uuid"},
                     "role": {"type": "string"},
                 }
-            }
+            },
+            404: {
+                "type": "object",
+                "properties": {"error": {"type": "string"}},
+            },
         }
     )
     def post(self, request, user_id):

@@ -90,26 +90,13 @@ class CreateChannelOrderSerializer(serializers.Serializer):
 
 class OrderDetailSerializer(serializers.ModelSerializer):
     """
-    Сериализатор для детальной информации о заказе
+    Детальная информация о заказе (список полей — в Meta.fields).
 
-    Поля:
-    - id: Уникальный идентификатор заказа в системе
-    - channel_id: ID связанного канала (ForeignKey -> Channel.id)
-    - channel_name: Название канала, в котором размещается реклама
-    - order_name: Название рекламного заказа (кампании)
-    - tags: Список тегов, связанных с заказом (ManyToMany -> Tag)
-    - spm: Spend per mille - стоимость 1000 показов в денежных единицах
-    - budget: Общий бюджет заказа, выделенный на рекламу
-    - total_views: Общее количество купленных показов
-    - shown_views: Количество уже показанных пользователям просмотров
-    - remaining_views: Оставшееся количество показов к отображению
-    - completed: Флаг завершения заказа (True = все показы израсходованы)
-    - cancelled: Флаг отмены заказа (True = заказ отменен пользователем)
-    - is_active: Флаг активности заказа (True = реклама показывается)
-    - refund_amount: Сумма, которая будет возвращена при отмене заказа
-    - max_views_per_user: Максимальное количество показов одному пользователю
-    - created_at: Дата и время создания заказа
-    - updated_at: Дата и время последнего обновления заказа
+    Из неочевидного:
+    - status: статус модерации (PENDING/APPROVED/REJECTED/BLOCKED)
+    - reject_reason: причина отклонения/блокировки от модератора
+    - refund_amount: сумма, которая вернётся при отмене заказа
+    - spm: стоимость 1000 показов
     """
     tags = serializers.SerializerMethodField()
     refund_amount = serializers.SerializerMethodField()

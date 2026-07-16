@@ -200,12 +200,25 @@ SIMPLE_JWT = {
 
 # API Documentation
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Channel Management API',
-    'DESCRIPTION': 'API for managing channels and orders',
-    'VERSION': '2.0.0',
+    'TITLE': 'NovaGram Business API',
+    'DESCRIPTION': 'Бэкенд рекламной платформы NovaGram: реклама в поиске каналов и чатах, '
+                   'модерация заказов, балансы, партнёрская программа и системные баннеры.',
+    'VERSION': '2.1.0',
     'SERVE_INCLUDE_SCHEMA': False,
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,  # не сбрасывать авторизацию
+    },
+    # Server-to-server эндпоинты (показ/клик рекламы, баннеры) закрыты заголовком
+    # X-API-Key, а не JWT — объявляем этот механизм, чтобы Swagger не врал про jwtAuth
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'serverApiKey': {
+                'type': 'apiKey',
+                'in': 'header',
+                'name': 'X-API-Key',
+                'description': 'Серверный ключ NovaGram (settings.AD_SERVER_API_KEY)',
+            },
+        },
     },
 }
 

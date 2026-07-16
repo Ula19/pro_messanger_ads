@@ -20,17 +20,11 @@ class ModerationChatOrderSerializer(ChatAdOrderSerializer):
         fields = ChatAdOrderSerializer.Meta.fields + ['username']
 
 
-class ModerationDecisionSerializer(serializers.Serializer):
+class ModerationReasonSerializer(serializers.Serializer):
     """
-    Тело решения модератора. Для reject и block причина обязательна —
-    пользователь увидит её у своего заказа. Для approve причина не нужна.
+    Тело reject/block: причина обязательна — пользователь увидит её у своего заказа.
+    Для approve тело запроса не нужно вовсе.
     """
-    reason = serializers.CharField(required=False, allow_blank=True, max_length=500,
+    reason = serializers.CharField(required=True, allow_blank=False, max_length=500,
                                    trim_whitespace=True,
-                                   help_text='Причина отклонения/блокировки (обязательна для reject и block)')
-
-    def validate(self, attrs):
-        action = self.context.get('action')
-        if action in ('reject', 'block') and not attrs.get('reason', '').strip():
-            raise serializers.ValidationError({'reason': 'Укажите причину отклонения/блокировки'})
-        return attrs
+                                   help_text='Причина отклонения/блокировки — её увидит пользователь')

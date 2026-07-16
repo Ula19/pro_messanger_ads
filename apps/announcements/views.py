@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from apps.common.pagination import StandardResultsSetPagination
 from apps.common.permissions import HasServerApiKey, IsSuperAdmin
+from apps.common.schema import ERROR_RESPONSE, MESSAGE_RESPONSE, SERVER_API_KEY_AUTH
 
 from .models import Announcement, AnnouncementDismissal
 from .serializers import (AnnouncementClientSerializer, AnnouncementManageSerializer,
@@ -61,7 +62,7 @@ class ActiveAnnouncementsView(APIView):
     permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
     throttle_classes = []  # доверенный сервер (server-to-server), глобальный троттл не нужен
 
-    @extend_schema(request=ActiveAnnouncementsRequestSerializer,
+    @extend_schema(request=ActiveAnnouncementsRequestSerializer, auth=SERVER_API_KEY_AUTH,
                    responses=AnnouncementClientSerializer(many=True))
     def post(self, request):
         serializer = ActiveAnnouncementsRequestSerializer(data=request.data)
@@ -82,9 +83,11 @@ class DismissAnnouncementView(APIView):
     permission_classes = [HasServerApiKey]
     throttle_classes = []
 
-    @extend_schema(request=DismissRequestSerializer, responses={200: {
-        "type": "object", "properties": {"message": {"type": "string"}}
-    }})
+    @extend_schema(request=DismissRequestSerializer, auth=SERVER_API_KEY_AUTH, responses={
+        200: MESSAGE_RESPONSE,
+        400: ERROR_RESPONSE,  # баннер незакрываемый (dismissible=false)
+        404: ERROR_RESPONSE,  # баннер не найден (мог быть удалён — клиенту просто игнорировать)
+    })
     def post(self, request):
         serializer = DismissRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -114,9 +117,10 @@ class ClickAnnouncementView(APIView):
     permission_classes = [HasServerApiKey]
     throttle_classes = []
 
-    @extend_schema(request=ClickRequestSerializer, responses={200: {
-        "type": "object", "properties": {"message": {"type": "string"}}
-    }})
+    @extend_schema(request=ClickRequestSerializer, auth=SERVER_API_KEY_AUTH, responses={
+        200: MESSAGE_RESPONSE,
+        404: ERROR_RESPONSE,  # баннер не найден
+    })
     def post(self, request):
         serializer = ClickRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

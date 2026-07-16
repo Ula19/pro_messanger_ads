@@ -1,5 +1,5 @@
 from django.db import transaction
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -7,11 +7,12 @@ from rest_framework.views import APIView
 from apps.common.models import ModerationStatus
 from apps.common.pagination import StandardResultsSetPagination
 from apps.common.permissions import IsModerator
+from apps.common.schema import ERROR_RESPONSE
 from apps.search_ads.models import Order
 from apps.chat_ads.models import ChatAdOrder
 
 from .serializers import (ModerationSearchOrderSerializer, ModerationChatOrderSerializer,
-                          ModerationDecisionSerializer)
+                          ModerationReasonSerializer)
 
 
 # Тип заказа приходит строкой в URL — маппим её на модель
@@ -73,38 +74,52 @@ class PendingCountView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-class ModerationDecisionView(generics.GenericAPIView):
-    """
-    Решение модератора по заказу: approve (одобрить), reject (отклонить с полным
-    возвратом денег), block (заблокировать за нарушение с возвратом остатка).
-    Действие и тип заказа приходят из URL.
-    """
-    serializer_class = ModerationDecisionSerializer
-    permission_classes = [IsModerator]
+# Общие ответы решений модератора (для схем в Swagger)
+DECISION_ERROR_RESPONSES = {
+    403: ERROR_RESPONSE,  # модератор пытается модерировать собственный заказ
+    404: ERROR_RESPONSE,  # неизвестный тип заказа или заказ не найден
+    409: ERROR_RESPONSE,  # заказ уже не в том статусе (например, решили раньше)
+}
 
-    @extend_schema(
-        request=ModerationDecisionSerializer,
-        responses={
-            200: {
-                "type": "object",
-                "properties": {
-                    "message": {"type": "string"},
-                    "order_id": {"type": "string", "format": "uuid"},
-                    "status": {"type": "string"},
-                    "refund_amount": {"type": "string"},
-                }
-            }
-        }
-    )
-    def post(self, request, order_type, order_id, action):
+APPROVE_RESPONSE = {
+    'type': 'object',
+    'properties': {
+        'message': {'type': 'string'},
+        'order_id': {'type': 'string', 'format': 'uuid'},
+        'status': {'type': 'string'},
+    },
+}
+
+REFUND_RESPONSE = {
+    'type': 'object',
+    'properties': {
+        'message': {'type': 'string'},
+        'order_id': {'type': 'string', 'format': 'uuid'},
+        'status': {'type': 'string'},
+        'refund_amount': {'type': 'string', 'format': 'decimal'},
+    },
+}
+
+
+class BaseModerationDecisionView(APIView):
+    """
+    Общий код решения модератора по заказу. Конкретное действие
+    (approve/reject/block) задаёт класс-наследник.
+    """
+    permission_classes = [IsModerator]
+    action = None  # 'approve' | 'reject' | 'block'
+
+    def post(self, request, order_type, order_id):
         model = ORDER_MODELS.get(order_type)
         if model is None:
             return Response({'error': 'Неизвестный тип заказа'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Валидируем причину (для reject/block она обязательна)
-        serializer = ModerationDecisionSerializer(data=request.data, context={'action': action})
-        serializer.is_valid(raise_exception=True)
-        reason = serializer.validated_data.get('reason', '').strip()
+        # Для reject/block причина обязательна (approve идёт без тела)
+        reason = ''
+        if self.action in ('reject', 'block'):
+            serializer = ModerationReasonSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            reason = serializer.validated_data['reason'].strip()
 
         try:
             with transaction.atomic():
@@ -118,9 +133,9 @@ class ModerationDecisionView(generics.GenericAPIView):
                                     status=status.HTTP_403_FORBIDDEN)
 
                 refund_amount = None
-                if action == 'approve':
+                if self.action == 'approve':
                     result = order.approve(request.user)
-                elif action == 'reject':
+                elif self.action == 'reject':
                     result = refund_amount = order.reject(request.user, reason)
                 else:  # block
                     result = refund_amount = order.block(request.user, reason)
@@ -140,7 +155,7 @@ class ModerationDecisionView(generics.GenericAPIView):
             'block': 'Заказ заблокирован, остаток бюджета возвращён пользователю',
         }
         response_data = {
-            'message': messages[action],
+            'message': messages[self.action],
             'order_id': str(order_id),
             'status': order.status,
         }
@@ -148,3 +163,30 @@ class ModerationDecisionView(generics.GenericAPIView):
             response_data['refund_amount'] = str(refund_amount)
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(post=extend_schema(
+    request=None,
+    responses={200: APPROVE_RESPONSE, **DECISION_ERROR_RESPONSES},
+))
+class ApproveOrderView(BaseModerationDecisionView):
+    """Одобрить заказ (только из PENDING) — реклама включается. Тело запроса не нужно."""
+    action = 'approve'
+
+
+@extend_schema_view(post=extend_schema(
+    request=ModerationReasonSerializer,
+    responses={200: REFUND_RESPONSE, **DECISION_ERROR_RESPONSES},
+))
+class RejectOrderView(BaseModerationDecisionView):
+    """Отклонить заказ (только из PENDING) — полный возврат денег. Причина обязательна."""
+    action = 'reject'
+
+
+@extend_schema_view(post=extend_schema(
+    request=ModerationReasonSerializer,
+    responses={200: REFUND_RESPONSE, **DECISION_ERROR_RESPONSES},
+))
+class BlockOrderView(BaseModerationDecisionView):
+    """Заблокировать заказ за нарушение (PENDING/APPROVED) — возврат остатка. Причина обязательна."""
+    action = 'block'

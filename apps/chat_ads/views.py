@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from apps.common.models import ModerationStatus
 from apps.common.pagination import StandardResultsSetPagination
 from apps.common.permissions import HasServerApiKey
+from apps.common.schema import ERROR_RESPONSE, MESSAGE_RESPONSE, SERVER_API_KEY_AUTH
 
 from apps.billing.models import Balance
 from apps.partner.models import ChannelEarning
@@ -90,7 +91,7 @@ class ChatAdOrderListView(generics.ListAPIView):
 class ChatAdOrderDetailView(generics.RetrieveAPIView):
     """
     Получение детальной информации о рекламе в чате.
-    GET /api/chat_post/orders/{order_id}/
+    GET /api/chat_ads/order/{order_id}/detail/
     """
     serializer_class = ChatAdOrderSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -123,7 +124,11 @@ class ChatAdCancelOrderView(generics.GenericAPIView):
     """Отмена заказа по ID в URL"""
     permission_classes = [permissions.IsAuthenticated]
 
-    @extend_schema(request=None, responses=ChatAdResponsesMessageSerializer)
+    @extend_schema(request=None, responses={
+        200: ChatAdResponsesMessageSerializer,
+        400: ERROR_RESPONSE,  # уже отменён / завершён / отклонён-заблокирован (деньги вернули)
+        404: ERROR_RESPONSE,  # не найден или чужой заказ
+    })
     def post(self, request, order_id):
         """
         Отменяет заказ пользователя.
@@ -196,15 +201,22 @@ class OrderActivationView(generics.GenericAPIView):
 
 class GetChatAdView(APIView):
     """
-    Эндпоинт для получения рекламы в чате.
-    POST /api/ads/get/
-    Body: {"channel_name": "news_channel", "viewer_id": "user_123"}
+    Получение рекламы для чата канала.
+    POST /api/chat_ads/order/search/
+    Body: {"channel_name": "...", "viewer_id": "...", "channel_id": 123}
+    (channel_id — числовой id канала-площадки; без него заработок площадке не начислится).
+    Успешный ответ — это засчитанный показ: у заказа атомарно списывается один показ.
+    404 — штатный исход «подходящей рекламы нет».
+    Доступ — только по заголовку X-API-Key (server-to-server от NovaGram).
     """
     serializer_class = AdRequestSerializer
     permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
     throttle_classes = []  # доверенный сервер (server-to-server), глобальный троттл 500/min тут не нужен
 
-    @extend_schema(request=AdRequestSerializer, responses=ChatAdSearchSerializer)
+    @extend_schema(request=AdRequestSerializer, auth=SERVER_API_KEY_AUTH, responses={
+        200: ChatAdSearchSerializer,
+        404: MESSAGE_RESPONSE,  # «Нет доступной рекламы...» — регулярный ответ, не ошибка
+    })
     def post(self, request):
         # 1. Валидация входных данных
         input_serializer = self.serializer_class(data=request.data)
@@ -283,7 +295,9 @@ class GetChatAdView(APIView):
                 # Отдаём рекламу. В БД показ уже списан; счётчики в объекте правим в памяти.
                 order.remaining_views -= 1
                 order.shown_views += 1
-                return Response(ChatAdSearchSerializer(order).data, status=status.HTTP_200_OK)
+                # context с request нужен, чтобы media_url был абсолютным
+                return Response(ChatAdSearchSerializer(order, context={'request': request}).data,
+                                status=status.HTTP_200_OK)
 
         # Если цикл прошел и ничего не вернул
         return Response(
@@ -295,12 +309,20 @@ class GetChatAdView(APIView):
 class ChatAdClickView(APIView):
     """
     Увеличивает счетчик кликов у объявления.
+    Доступ — только по заголовку X-API-Key (server-to-server от NovaGram).
+    400 приходит, если заказ не найден или уже не активен (завершён/выключен).
     """
     permission_classes = [HasServerApiKey]  # только запросы с сервера NovaGram (по API-ключу)
     throttle_classes = []  # доверенный сервер, глобальный троттл тут не нужен
     serializer_class = ChatAdClickOrderSerializer
 
-    @extend_schema(request=ChatAdClickOrderSerializer, responses=ChatAdResponsesMessageSerializer)
+    @extend_schema(request=ChatAdClickOrderSerializer, auth=SERVER_API_KEY_AUTH, responses={
+        200: ChatAdResponsesMessageSerializer,
+        400: {
+            'type': 'object',
+            'properties': {'order_id': {'type': 'array', 'items': {'type': 'string'}}},
+        },
+    })
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)

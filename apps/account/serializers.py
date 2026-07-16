@@ -68,9 +68,10 @@ class AdminUserSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.DecimalField(max_digits=15, decimal_places=2, allow_null=True))
     def get_balance(self, obj):
-        # У суперадмина, созданного через createsuperuser, баланса может не быть
+        # У суперадмина, созданного через createsuperuser, баланса может не быть.
+        # Строкой — как amount в /api/balance/ (Decimal в JSON иначе стал бы float)
         balance = getattr(obj, 'balance', None)
-        return balance.amount if balance else None
+        return str(balance.amount) if balance else None
 
 
 class UserRoleUpdateSerializer(serializers.Serializer):

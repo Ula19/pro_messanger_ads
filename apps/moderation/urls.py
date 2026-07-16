@@ -1,7 +1,7 @@
 from django.urls import path
 
 from .views import (PendingSearchAdsListView, PendingChatAdsListView, PendingCountView,
-                    ModerationDecisionView)
+                    ApproveOrderView, RejectOrderView, BlockOrderView)
 
 
 urlpatterns = [
@@ -13,10 +13,7 @@ urlpatterns = [
     path('pending_count/', PendingCountView.as_view(), name='moderation-pending-count'),
 
     # Решения модератора; order_type — search_ads или chat_ads
-    path('<str:order_type>/<uuid:order_id>/approve/', ModerationDecisionView.as_view(),
-         {'action': 'approve'}, name='moderation-approve'),
-    path('<str:order_type>/<uuid:order_id>/reject/', ModerationDecisionView.as_view(),
-         {'action': 'reject'}, name='moderation-reject'),
-    path('<str:order_type>/<uuid:order_id>/block/', ModerationDecisionView.as_view(),
-         {'action': 'block'}, name='moderation-block'),
+    path('<str:order_type>/<uuid:order_id>/approve/', ApproveOrderView.as_view(), name='moderation-approve'),
+    path('<str:order_type>/<uuid:order_id>/reject/', RejectOrderView.as_view(), name='moderation-reject'),
+    path('<str:order_type>/<uuid:order_id>/block/', BlockOrderView.as_view(), name='moderation-block'),
 ]

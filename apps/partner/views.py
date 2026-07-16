@@ -1,10 +1,11 @@
 from django.db import transaction
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.pagination import StandardResultsSetPagination
+from apps.common.schema import ERROR_RESPONSE, MESSAGE_RESPONSE
 from .models import ChannelEarning
 from .serializers import (
     PublicEarningSerializer, MyEarningSerializer, ClaimRequestSerializer,
@@ -19,7 +20,14 @@ class PublicEarningView(APIView):
     """
     permission_classes = [permissions.AllowAny]
 
-    @extend_schema(responses=PublicEarningSerializer)
+    @extend_schema(
+        parameters=[OpenApiParameter(name='channel_id', type=int, required=True,
+                                     description='Числовой id канала-площадки в Telegram')],
+        responses={
+            200: PublicEarningSerializer,
+            400: ERROR_RESPONSE,  # channel_id не передан или не число
+        },
+    )
     def get(self, request):
         raw_id = request.query_params.get('channel_id', '')
         try:
@@ -51,7 +59,11 @@ class ClaimChannelView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ClaimRequestSerializer
 
-    @extend_schema(request=ClaimRequestSerializer, responses=MessageSerializer)
+    @extend_schema(request=ClaimRequestSerializer, responses={
+        201: MessageSerializer,   # канал успешно закреплён
+        200: MessageSerializer,   # канал уже был закреплён за вами
+        409: ERROR_RESPONSE,      # канал закреплён за другим пользователем
+    })
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -92,7 +104,11 @@ class WithdrawEarningView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = WithdrawRequestSerializer
 
-    @extend_schema(request=WithdrawRequestSerializer, responses=MessageSerializer)
+    @extend_schema(request=WithdrawRequestSerializer, responses={
+        200: MessageSerializer,   # переведено на баланс
+        400: MESSAGE_RESPONSE,    # нет средств к выводу
+        404: ERROR_RESPONSE,      # канал не найден или не закреплён за вами
+    })
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
