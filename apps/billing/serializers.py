@@ -51,12 +51,6 @@ class AdminDepositSerializer(serializers.Serializer):
                 "user_id": f"Пользователь с ID {user_id} не найден"
             })
 
-        # Проверяем, что пользователь не пополняет свой баланс
-        # (если нужно разрешить пополнение своего баланса админом, удалите эту проверку)
-        request = self.context.get('request')
-        if request and request.user.user_id == user_id:
-            raise serializers.ValidationError({
-                "user_id": "Администратор не может пополнять свой собственный баланс через этот эндпоинт"
-            })
-
+        # Свой баланс суперадмин тоже может пополнить — он единственный,
+        # кто вообще управляет деньгами, запрещать самому себе смысла нет
         return data

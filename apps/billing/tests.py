@@ -2,10 +2,43 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, Client
+from rest_framework.test import APIClient
 
 from apps.billing.models import Balance
 
 User = get_user_model()
+
+
+class AdminDepositApiTests(TestCase):
+    """Пополнение через API: суперадмин может пополнить и чужой, и свой баланс"""
+
+    def setUp(self):
+        self.superadmin = User.objects.create_superuser('boss', 'boss@test.uz', 'pass12345')
+        self.client = APIClient()
+        self.client.force_authenticate(self.superadmin)
+
+    def test_superadmin_deposits_own_balance(self):
+        response = self.client.post('/api/admin/balance/deposit/', {
+            'user_id': str(self.superadmin.user_id),
+            'amount': '150.00',
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['balance_info']['new_balance'], '150.00')
+
+        # Баланса у createsuperuser не было — get_or_create его создал
+        self.assertEqual(self.superadmin.balance.amount, Decimal('150.00'))
+
+    def test_superadmin_deposits_other_user(self):
+        user = User.objects.create_user('advertiser', password='pass12345')
+        Balance.objects.create(user=user, amount=Decimal('10.00'))
+
+        response = self.client.post('/api/admin/balance/deposit/', {
+            'user_id': str(user.user_id),
+            'amount': '90.00',
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        user.balance.refresh_from_db()
+        self.assertEqual(user.balance.amount, Decimal('100.00'))
 
 
 class BalanceAdminDepositTests(TestCase):
