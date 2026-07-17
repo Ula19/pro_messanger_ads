@@ -38,6 +38,9 @@ services:
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+      # Сервисный ключ Firebase для push (лежит рядом с проектом, в git не коммитится).
+      # ВАЖНО: файл должен лежать на хосте ДО docker compose up — иначе docker создаст ПАПКУ firebase.json
+      - ./firebase.json:/app/firebase.json:ro
     # Все переменные (SECRET_KEY, DEBUG, ALLOWED_HOSTS, DATABASES_*) приходят из .env через env_file.
     # Порт наружу НЕ публикуем — доступ к Django только через nginx.
     env_file:
@@ -66,6 +69,7 @@ services:
         hard: 8192
     volumes:
       - media_volume:/app/media # ОБЯЗАТЕЛЬНО: воркер должен видеть файлы, чтобы удалить их
+      - ./firebase.json:/app/firebase.json:ro # push шлёт именно воркер
     env_file:
       - .env
     environment:

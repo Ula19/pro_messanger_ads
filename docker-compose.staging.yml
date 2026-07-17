@@ -1,0 +1,22 @@
+# Оверрайд для ИЗОЛИРОВАННОГО нагрузочного теста на сервере.
+# Запускать вместе с базовым файлом и отдельным проектом:
+#   docker compose -p adsstaging -f docker-compose.yml -f docker-compose.staging.yml up -d --build db redis web celery_worker celery_beat
+#
+# Что делает изоляцию:
+#  - уникальные container_name (stg_*), чтобы не столкнуться с прод-контейнерами channel_*;
+#  - проект adsstaging -> свои сети и volumes (adsstaging_postgres_data и т.д.) — СВЕЖАЯ БД,
+#    прод-БД не затрагивается;
+#  - nginx не поднимаем (k6 бьёт прямо в web:9000 внутри сети) — не занимаем порт 18080 прода.
+services:
+  db:
+    container_name: stg_db
+  redis:
+    container_name: stg_redis
+  web:
+    container_name: stg_web
+  celery_worker:
+    container_name: stg_worker
+  celery_beat:
+    container_name: stg_beat
+  nginx:
+    container_name: stg_nginx
