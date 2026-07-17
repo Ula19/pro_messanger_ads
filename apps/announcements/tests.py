@@ -36,14 +36,14 @@ class AnnouncementManageTests(TestCase):
         for user in (self.advertiser, self.moderator):
             client = APIClient()
             client.force_authenticate(user)
-            self.assertEqual(client.get('/api/announcements/manage/').status_code, 403)
-            self.assertEqual(client.post('/api/announcements/manage/', {}).status_code, 403)
+            self.assertEqual(client.get('/api/banner_ads/manage/').status_code, 403)
+            self.assertEqual(client.post('/api/banner_ads/manage/', {}).status_code, 403)
 
         anon = APIClient()
-        self.assertEqual(anon.get('/api/announcements/manage/').status_code, 401)
+        self.assertEqual(anon.get('/api/banner_ads/manage/').status_code, 401)
 
     def test_create_banner(self):
-        response = self.client_boss.post('/api/announcements/manage/', {
+        response = self.client_boss.post('/api/banner_ads/manage/', {
             'title': 'Важно',
             'text': 'Обновите приложение',
             'link': 'https://example.com',
@@ -56,7 +56,7 @@ class AnnouncementManageTests(TestCase):
 
     def test_ends_before_starts_rejected(self):
         now = timezone.now()
-        response = self.client_boss.post('/api/announcements/manage/', {
+        response = self.client_boss.post('/api/banner_ads/manage/', {
             'title': 'Баннер', 'text': 'Текст',
             'starts_at': now.isoformat(),
             'ends_at': (now - timedelta(days=1)).isoformat(),
@@ -66,7 +66,7 @@ class AnnouncementManageTests(TestCase):
     def test_patch_single_date_validated_against_instance(self):
         """PATCH только ends_at сверяется со старым starts_at"""
         banner = create_banner(starts_at=timezone.now())
-        response = self.client_boss.patch(f'/api/announcements/manage/{banner.id}/', {
+        response = self.client_boss.patch(f'/api/banner_ads/manage/{banner.id}/', {
             'ends_at': (timezone.now() - timedelta(days=1)).isoformat(),
         }, format='json')
         self.assertEqual(response.status_code, 400)
@@ -76,7 +76,7 @@ class AnnouncementManageTests(TestCase):
         AnnouncementDismissal.objects.create(announcement=banner, viewer_id='v1')
         AnnouncementDismissal.objects.create(announcement=banner, viewer_id='v2')
 
-        response = self.client_boss.get('/api/announcements/manage/')
+        response = self.client_boss.get('/api/banner_ads/manage/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['results'][0]['dismissals_count'], 2)
 
@@ -85,11 +85,11 @@ class AnnouncementManageTests(TestCase):
         banner = create_banner(created_by=User.objects.create_superuser('old', 'o@t.uz', 'pass12345'))
         User.objects.get(username='old').delete()  # FK SET_NULL
 
-        get_resp = self.client_boss.get(f'/api/announcements/manage/{banner.id}/')
+        get_resp = self.client_boss.get(f'/api/banner_ads/manage/{banner.id}/')
         self.assertIn('created_by', get_resp.data)
         self.assertIsNone(get_resp.data['created_by'])
 
-        patch_resp = self.client_boss.patch(f'/api/announcements/manage/{banner.id}/',
+        patch_resp = self.client_boss.patch(f'/api/banner_ads/manage/{banner.id}/',
                                             {'priority': 1}, format='json')
         self.assertEqual(patch_resp.status_code, 200)
         self.assertIn('created_by', patch_resp.data)
@@ -97,13 +97,13 @@ class AnnouncementManageTests(TestCase):
 
     def test_deactivate_and_delete(self):
         banner = create_banner()
-        response = self.client_boss.patch(f'/api/announcements/manage/{banner.id}/',
+        response = self.client_boss.patch(f'/api/banner_ads/manage/{banner.id}/',
                                           {'is_active': False}, format='json')
         self.assertEqual(response.status_code, 200)
         banner.refresh_from_db()
         self.assertFalse(banner.is_active)
 
-        response = self.client_boss.delete(f'/api/announcements/manage/{banner.id}/')
+        response = self.client_boss.delete(f'/api/banner_ads/manage/{banner.id}/')
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Announcement.objects.exists())
 
@@ -116,20 +116,20 @@ class AnnouncementClientTests(TestCase):
         self.server = APIClient()
 
     def _active(self, viewer_id='v1'):
-        return self.server.post('/api/announcements/active/', {'viewer_id': viewer_id},
+        return self.server.post('/api/banner_ads/active/', {'viewer_id': viewer_id},
                                 format='json', HTTP_X_API_KEY=API_KEY)
 
     def _dismiss(self, banner_id, viewer_id='v1'):
-        return self.server.post('/api/announcements/dismiss/',
+        return self.server.post('/api/banner_ads/dismiss/',
                                 {'announcement_id': str(banner_id), 'viewer_id': viewer_id},
                                 format='json', HTTP_X_API_KEY=API_KEY)
 
     def test_api_key_required(self):
         banner = create_banner()
         for url, body in (
-            ('/api/announcements/active/', {'viewer_id': 'v1'}),
-            ('/api/announcements/dismiss/', {'announcement_id': str(banner.id), 'viewer_id': 'v1'}),
-            ('/api/announcements/click/', {'announcement_id': str(banner.id)}),
+            ('/api/banner_ads/active/', {'viewer_id': 'v1'}),
+            ('/api/banner_ads/dismiss/', {'announcement_id': str(banner.id), 'viewer_id': 'v1'}),
+            ('/api/banner_ads/click/', {'announcement_id': str(banner.id)}),
         ):
             no_key = self.server.post(url, body, format='json')
             self.assertIn(no_key.status_code, (401, 403))
@@ -178,7 +178,7 @@ class AnnouncementClientTests(TestCase):
 
     def test_click_increments(self):
         banner = create_banner()
-        response = self.server.post('/api/announcements/click/',
+        response = self.server.post('/api/banner_ads/click/',
                                     {'announcement_id': str(banner.id)},
                                     format='json', HTTP_X_API_KEY=API_KEY)
         self.assertEqual(response.status_code, 200)
@@ -188,7 +188,7 @@ class AnnouncementClientTests(TestCase):
     def test_click_on_disabled_banner_still_counts(self):
         """Клик мог прийти с задержкой, когда баннер уже выключили"""
         banner = create_banner(is_active=False)
-        response = self.server.post('/api/announcements/click/',
+        response = self.server.post('/api/banner_ads/click/',
                                     {'announcement_id': str(banner.id)},
                                     format='json', HTTP_X_API_KEY=API_KEY)
         self.assertEqual(response.status_code, 200)
@@ -196,7 +196,7 @@ class AnnouncementClientTests(TestCase):
         self.assertEqual(banner.clicks, 1)
 
     def test_click_missing_banner(self):
-        response = self.server.post('/api/announcements/click/',
+        response = self.server.post('/api/banner_ads/click/',
                                     {'announcement_id': '00000000-0000-0000-0000-000000000000'},
                                     format='json', HTTP_X_API_KEY=API_KEY)
         self.assertEqual(response.status_code, 404)
