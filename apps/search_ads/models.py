@@ -67,7 +67,7 @@ class Order(ModerationMixin):
     order_name = models.CharField(verbose_name='Order Name', max_length=255)
     tags = models.ManyToManyField(Tag, related_name='orders', blank=True, verbose_name='Tags')
     platform = models.CharField(verbose_name='Платформа', max_length=20,
-                                choices=Platform.choices, default=Platform.TELEGRAM)
+                                choices=Platform.choices, default=Platform.NOVAGRAM)
 
     # Параметры заказа
     spm = models.DecimalField(verbose_name='SPM', max_digits=10, decimal_places=2,

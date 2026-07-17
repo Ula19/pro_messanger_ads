@@ -136,7 +136,7 @@ class ChatAdOrder(ModerationMixin):
     text = models.TextField(verbose_name='Текст рекламы', help_text='Основной текст рекламного сообщения')
     link = models.CharField(verbose_name='Ссылка рекламы', help_text='URL для перехода по рекламе')
     platform = models.CharField(verbose_name='Платформа', max_length=20,
-                                choices=Platform.choices, default=Platform.TELEGRAM)
+                                choices=Platform.choices, default=Platform.NOVAGRAM)
 
     # Поле для указания каналов (строка с названиями через запятую)
     channels = models.TextField(verbose_name='Каналы для показа',
