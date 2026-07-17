@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'apps.partner',
     'apps.moderation',
     'apps.announcements',
+    'apps.notifications',
 ]
 
 MIDDLEWARE = [
@@ -205,6 +206,12 @@ SPECTACULAR_SETTINGS = {
                    'модерация заказов, балансы, партнёрская программа и системные баннеры.',
     'VERSION': '2.1.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    # У Device и заказов поле называется platform, но наборы значений разные
+    # (IOS/ANDROID vs TELEGRAM/NOVAGRAM) — разводим имена enum'ов в схеме
+    'ENUM_NAME_OVERRIDES': {
+        'DevicePlatformEnum': 'apps.notifications.models.Device.Platform',
+        'AdPlatformEnum': 'apps.chat_ads.models.ChatAdOrder.Platform',
+    },
     "SWAGGER_UI_SETTINGS": {
         "persistAuthorization": True,  # не сбрасывать авторизацию
     },
@@ -261,3 +268,7 @@ PARTNER_SHARE_RATE = os.getenv('PARTNER_SHARE_RATE', '0.5')
 # Серверный API-ключ для доступа к показу/клику рекламы (server-to-server с NovaGram).
 # Пусто → доступ к этим эндпоинтам закрыт (fail-closed). Секрет — в .env.
 AD_SERVER_API_KEY = os.getenv('AD_SERVER_API_KEY')
+
+# Путь к сервисному JSON-ключу Firebase (push-уведомления в NovaGram Business).
+# Пусто или файла нет → push молча отключён, in-app уведомления работают.
+FIREBASE_CREDENTIALS_FILE = os.getenv('FIREBASE_CREDENTIALS_FILE', '')

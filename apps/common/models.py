@@ -97,6 +97,7 @@ class ModerationMixin(models.Model):
         self.moderated_by = moderator
         self.moderated_at = timezone.now()
         self.save()
+        self._notify_owner()
         return True
 
     def reject(self, moderator, reason):
@@ -113,6 +114,7 @@ class ModerationMixin(models.Model):
         self.moderated_by = moderator
         self.moderated_at = timezone.now()
         self.save()
+        self._notify_owner()
         return refund_amount
 
     def block(self, moderator, reason):
@@ -131,4 +133,11 @@ class ModerationMixin(models.Model):
         self.moderated_by = moderator
         self.moderated_at = timezone.now()
         self.save()
+        self._notify_owner()
         return refund_amount
+
+    def _notify_owner(self):
+        """Уведомляет владельца заказа о решении модератора (in-app + push)"""
+        # Импорт внутри метода — иначе циклический импорт common <-> notifications
+        from apps.notifications.services import notify_order_decision
+        notify_order_decision(self)

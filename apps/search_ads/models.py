@@ -140,6 +140,11 @@ class Order(ModerationMixin):
 
         super().save(*args, **kwargs)
 
+        # Новый заказ упал в очередь модерации — сообщаем модераторам
+        if is_new:
+            from apps.notifications.services import notify_moderators_new_order
+            notify_moderators_new_order(self)
+
         # Добавляем теги после сохранения
         if hasattr(self, '_tag_names'):
             # Добавляем теги к заказу

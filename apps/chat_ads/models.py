@@ -244,6 +244,11 @@ class ChatAdOrder(ModerationMixin):
 
         super().save(*args, **kwargs)
 
+        # Новый заказ упал в очередь модерации — сообщаем модераторам
+        if is_new:
+            from apps.notifications.services import notify_moderators_new_order
+            notify_moderators_new_order(self)
+
     def decrement_views(self, amount=1):
         """Уменьшает количество оставшихся показов"""
         if self.remaining_views >= amount and not self.cancelled:

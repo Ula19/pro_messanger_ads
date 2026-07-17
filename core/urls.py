@@ -31,6 +31,7 @@ urlpatterns = [
     path('api/partner/', include('apps.partner.urls')),
     path('api/moderation/', include('apps.moderation.urls')),
     path('api/banner_ads/', include('apps.announcements.urls')),
+    path('api/notifications/', include('apps.notifications.urls')),
 ]
 
 if settings.DEBUG:
