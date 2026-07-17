@@ -48,6 +48,23 @@ class RegistrationAndRoleTests(TestCase):
         self.assertEqual(response.data['role'], 'ADVERTISER')
         self.assertNotIn('is_admin', response.data)
 
+    def test_superadmin_sees_admin_role_in_login_and_profile(self):
+        """Суперадмин в role получает ADMIN — так фронт понимает, что это админка"""
+        User.objects.create_superuser('boss', 'boss@test.uz', 'Str0ngPass!23')
+
+        client = APIClient()
+        login = client.post('/api/auth/login/', {
+            'username': 'boss',
+            'password': 'Str0ngPass!23',
+        }, format='json')
+        self.assertEqual(login.status_code, 200)
+        self.assertEqual(login.data['role'], 'ADMIN')
+
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
+        profile = client.get('/api/auth/profile/')
+        self.assertEqual(profile.status_code, 200)
+        self.assertEqual(profile.data['role'], 'ADMIN')
+
     def test_superadmin_assigns_moderator(self):
         superadmin = User.objects.create_superuser('boss', 'boss@test.uz', 'pass12345')
         user = User.objects.create_user('future_mod', password='pass12345')

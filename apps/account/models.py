@@ -35,3 +35,8 @@ class CustomUser(AbstractUser):
     def is_moderator(self):
         """Может ли пользователь модерировать рекламу (модератор или суперадмин)"""
         return self.is_superuser or self.role == self.Role.MODERATOR
+
+    @property
+    def api_role(self):
+        """Роль для ответов API: суперадмин отдаётся как ADMIN, чтобы фронт его узнал"""
+        return 'ADMIN' if self.is_superuser else self.role

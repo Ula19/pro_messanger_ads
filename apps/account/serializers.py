@@ -47,12 +47,15 @@ class UserLoginSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
         data['user_id'] = self.user.user_id
         data['username'] = self.user.username
-        data['role'] = self.user.role
+        data['role'] = self.user.api_role
         return data
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
     """Сериализатор для профиля пользователя"""
+    # api_role: суперадмин видит ADMIN, остальные — свою роль как есть
+    role = serializers.CharField(source='api_role', read_only=True)
+
     class Meta:
         model = User
         fields = ['user_id', 'username', 'email', 'first_name', 'last_name', 'date_joined', 'role']
@@ -61,6 +64,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class AdminUserSerializer(serializers.ModelSerializer):
     """Пользователь глазами суперадмина (список для назначения ролей и пополнения)"""
     balance = serializers.SerializerMethodField()
+    role = serializers.CharField(source='api_role', read_only=True)
 
     class Meta:
         model = User
