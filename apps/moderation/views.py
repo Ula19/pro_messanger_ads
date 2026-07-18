@@ -1,12 +1,13 @@
 from django.db import transaction
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from django.db.models import Q
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.models import ModerationStatus
 from apps.common.pagination import StandardResultsSetPagination
-from apps.common.permissions import IsModerator
+from apps.common.permissions import IsModerator, IsSuperAdmin
 from apps.common.schema import ERROR_RESPONSE
 from apps.search_ads.models import Order
 from apps.chat_ads.models import ChatAdOrder
@@ -48,6 +49,60 @@ class PendingChatAdsListView(generics.ListAPIView):
         return (ChatAdOrder.objects.filter(status=ModerationStatus.PENDING, cancelled=False)
                 .select_related('user', 'media_url')
                 .order_by('created_at'))
+
+
+class BaseAllOrdersListView(generics.ListAPIView):
+    """
+    Все заказы всех пользователей для админ-панели (новые первыми).
+    Фильтры: ?status=PENDING|APPROVED|REJECTED|BLOCKED, ?is_active=true,
+    ?search= по названию заказа или логину владельца.
+    """
+    permission_classes = [IsSuperAdmin]
+    pagination_class = StandardResultsSetPagination
+    model = None  # задаёт наследник
+
+    @extend_schema(parameters=[
+        OpenApiParameter('status', str, description='Фильтр по статусу модерации'),
+        OpenApiParameter('is_active', str, description='true — только активные (крутятся сейчас)'),
+        OpenApiParameter('search', str, description='Поиск по названию заказа или логину владельца'),
+    ])
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = self.model.objects.select_related('user').order_by('-created_at')
+        params = self.request.query_params
+
+        status_param = params.get('status')
+        if status_param in ModerationStatus.values:
+            queryset = queryset.filter(status=status_param)
+        if params.get('is_active') == 'true':
+            queryset = queryset.filter(is_active=True)
+
+        search = params.get('search', '').strip()
+        if search:
+            queryset = queryset.filter(
+                Q(order_name__icontains=search) | Q(user__username__icontains=search))
+        return queryset
+
+
+class AllSearchAdsListView(BaseAllOrdersListView):
+    """Все заказы поисковой рекламы. Только суперадмин."""
+    serializer_class = ModerationSearchOrderSerializer
+    model = Order
+
+    def get_queryset(self):
+        # channel и теги нужны сериализатору — дотягиваем без N+1
+        return super().get_queryset().select_related('channel_id').prefetch_related('tags')
+
+
+class AllChatAdsListView(BaseAllOrdersListView):
+    """Все заказы рекламы в чатах. Только суперадмин."""
+    serializer_class = ModerationChatOrderSerializer
+    model = ChatAdOrder
+
+    def get_queryset(self):
+        return super().get_queryset().select_related('media_url')
 
 
 class PendingCountView(APIView):

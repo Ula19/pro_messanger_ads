@@ -341,3 +341,88 @@ class ModerationPermissionTests(TestCase):
         anon = APIClient()
         self.assertEqual(anon.get('/api/moderation/pending_count/').status_code, 401)
         self.assertEqual(anon.post('/api/admin/balance/deposit/').status_code, 401)
+
+
+class SuperadminAutoApproveTests(TestCase):
+    """Заказ суперадмина не нуждается в модерации — одобряется при создании"""
+
+    def setUp(self):
+        self.boss = User.objects.create_superuser('boss', 'boss@test.uz', 'pass12345')
+        Balance.objects.create(user=self.boss, amount=Decimal('100.00'))
+        self.client_boss = APIClient()
+        self.client_boss.force_authenticate(self.boss)
+
+    def test_superadmin_chat_order_is_approved_immediately(self):
+        response = create_chat_order_via_api(self.client_boss)
+        self.assertEqual(response.status_code, 201)
+
+        order = ChatAdOrder.objects.get()
+        self.assertEqual(order.status, ModerationStatus.APPROVED)
+        self.assertTrue(order.is_active)
+        self.assertEqual(order.moderated_by, self.boss)
+        # В очередь модерации не попал и никого не дёргал уведомлением
+        from apps.notifications.models import Notification
+        self.assertFalse(Notification.objects.filter(type='NEW_ORDER').exists())
+
+    def test_superadmin_search_order_is_approved_immediately(self):
+        response = create_search_order_via_api(self.client_boss)
+        self.assertEqual(response.status_code, 201)
+
+        order = Order.objects.get()
+        self.assertEqual(order.status, ModerationStatus.APPROVED)
+        self.assertTrue(order.is_active)
+
+    def test_regular_user_order_still_pending(self):
+        advertiser = create_user('advertiser')
+        client = APIClient()
+        client.force_authenticate(advertiser)
+
+        create_chat_order_via_api(client)
+        order = ChatAdOrder.objects.get()
+        self.assertEqual(order.status, ModerationStatus.PENDING)
+        self.assertFalse(order.is_active)
+
+
+class AllOrdersListTests(TestCase):
+    """Список всех заказов для админ-панели: только суперадмин, фильтры, поиск"""
+
+    def setUp(self):
+        self.boss = User.objects.create_superuser('boss', 'boss@test.uz', 'pass12345')
+        Balance.objects.create(user=self.boss, amount=Decimal('100.00'))
+        self.moderator = create_user('moder', role=User.Role.MODERATOR)
+        self.advertiser = create_user('advertiser')
+
+        client_adv = APIClient()
+        client_adv.force_authenticate(self.advertiser)
+        create_chat_order_via_api(client_adv, order_name='Заказ юзера')
+
+        self.client_boss = APIClient()
+        self.client_boss.force_authenticate(self.boss)
+        create_chat_order_via_api(self.client_boss, order_name='Заказ админа')
+
+    def test_closed_for_moderator_and_advertiser(self):
+        for user in (self.moderator, self.advertiser):
+            client = APIClient()
+            client.force_authenticate(user)
+            self.assertEqual(client.get('/api/moderation/chat_ads/all/').status_code, 403)
+
+    def test_superadmin_sees_all_orders(self):
+        response = self.client_boss.get('/api/moderation/chat_ads/all/')
+        self.assertEqual(response.status_code, 200)
+        names = {item['order_name'] for item in response.data['results']}
+        self.assertEqual(names, {'Заказ юзера', 'Заказ админа'})
+
+    def test_filter_by_status_and_active(self):
+        # Заказ админа авто-одобрен, заказ юзера — PENDING
+        approved = self.client_boss.get('/api/moderation/chat_ads/all/', {'status': 'APPROVED'})
+        self.assertEqual([i['order_name'] for i in approved.data['results']], ['Заказ админа'])
+
+        active = self.client_boss.get('/api/moderation/chat_ads/all/', {'is_active': 'true'})
+        self.assertEqual([i['order_name'] for i in active.data['results']], ['Заказ админа'])
+
+    def test_search_by_name_and_owner(self):
+        by_name = self.client_boss.get('/api/moderation/chat_ads/all/', {'search': 'юзера'})
+        self.assertEqual(by_name.data['count'], 1)
+
+        by_owner = self.client_boss.get('/api/moderation/chat_ads/all/', {'search': 'advertiser'})
+        self.assertEqual([i['order_name'] for i in by_owner.data['results']], ['Заказ юзера'])
