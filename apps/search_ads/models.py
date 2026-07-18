@@ -132,16 +132,16 @@ class Order(ModerationMixin):
             self.total_views = self.calculate_views_from_budget()
             self.remaining_views = self.total_views
 
-        # Новый заказ всегда уходит на модерацию и не показывается,
-        # какие бы значения ни пришли снаружи. Включить его может только approve().
+        # Новый заказ уходит на модерацию, какие бы значения ни пришли снаружи.
+        # Исключение — заказ суперадмина: он одобряется сразу (сам себе модератор).
         if is_new:
-            self.status = ModerationStatus.PENDING
-            self.is_active = False
+            self.set_initial_moderation_status()
 
         super().save(*args, **kwargs)
 
-        # Новый заказ упал в очередь модерации — сообщаем модераторам
-        if is_new:
+        # Заказ упал в очередь модерации — сообщаем модераторам
+        # (авто-одобренный заказ суперадмина в очередь не попадает)
+        if is_new and self.status == ModerationStatus.PENDING:
             from apps.notifications.services import notify_moderators_new_order
             notify_moderators_new_order(self)
 

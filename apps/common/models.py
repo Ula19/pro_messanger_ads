@@ -84,6 +84,21 @@ class ModerationMixin(models.Model):
             return refund_amount.quantize(Decimal('0.01'), rounding=ROUND_DOWN)
         return Decimal('0')
 
+    def set_initial_moderation_status(self):
+        """
+        Статус нового заказа. Вызывается из save() моделей при создании.
+        Суперадмин модерирует сам себя — его заказ сразу APPROVED и активен;
+        заказы остальных уходят в очередь модерации (PENDING, выключен).
+        """
+        if self.user.is_superuser:
+            self.status = ModerationStatus.APPROVED
+            self.is_active = True
+            self.moderated_by = self.user
+            self.moderated_at = timezone.now()
+        else:
+            self.status = ModerationStatus.PENDING
+            self.is_active = False
+
     def approve(self, moderator):
         """
         Одобряет заказ — включает показы. Разрешено только из статуса PENDING.
