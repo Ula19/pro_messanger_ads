@@ -138,9 +138,11 @@ class ChatAdOrder(ModerationMixin):
     platform = models.CharField(verbose_name='Платформа', max_length=20,
                                 choices=Platform.choices, default=Platform.NOVAGRAM)
 
-    # Поле для указания каналов (строка с названиями через запятую)
-    channels = models.TextField(verbose_name='Каналы для показа',
-                                help_text='Названия каналов через запятую (например: "channel1, channel2")')
+    # Поле для указания каналов (строка с названиями через запятую).
+    # Пусто — таргетинга нет, реклама показывается во ВСЕХ каналах
+    channels = models.TextField(verbose_name='Каналы для показа', blank=True, default='',
+                                help_text='Названия каналов через запятую (например: "channel1, channel2"). '
+                                          'Пусто — показывать во всех каналах')
 
     # ВМЕСТО старых полей image и video делаем связь с Media
     # null=True, blank=True — если реклама только текстовая
@@ -216,6 +218,9 @@ class ChatAdOrder(ModerationMixin):
     def is_channel_in_list(self, channel_name):
         """Проверяет, есть ли канал в списке для показа"""
         channel_list = self.get_channel_list()
+        # Пустой список = таргетинга нет, показываем в любом канале
+        if not channel_list:
+            return True
         return channel_name in channel_list
 
     def calculate_views_from_budget(self):
@@ -236,16 +241,16 @@ class ChatAdOrder(ModerationMixin):
             self.total_views = self.calculate_views_from_budget()
             self.remaining_views = self.total_views
 
-        # Новый заказ всегда уходит на модерацию и не показывается,
-        # какие бы значения ни пришли снаружи. Включить его может только approve().
+        # Новый заказ уходит на модерацию, какие бы значения ни пришли снаружи.
+        # Исключение — заказ суперадмина: он одобряется сразу (сам себе модератор).
         if is_new:
-            self.status = ModerationStatus.PENDING
-            self.is_active = False
+            self.set_initial_moderation_status()
 
         super().save(*args, **kwargs)
 
-        # Новый заказ упал в очередь модерации — сообщаем модераторам
-        if is_new:
+        # Заказ упал в очередь модерации — сообщаем модераторам
+        # (авто-одобренный заказ суперадмина в очередь не попадает)
+        if is_new and self.status == ModerationStatus.PENDING:
             from apps.notifications.services import notify_moderators_new_order
             notify_moderators_new_order(self)
 

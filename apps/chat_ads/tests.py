@@ -84,3 +84,53 @@ class ChatAdsModerationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['status'], 'REJECTED')
         self.assertEqual(response.data['reject_reason'], 'Запрещённая тематика')
+
+
+@override_settings(AD_SERVER_API_KEY=API_KEY)
+class EmptyChannelsTargetingTests(TestCase):
+    """Пустой channels = без таргетинга: реклама показывается в любом канале"""
+
+    def setUp(self):
+        self.advertiser = User.objects.create_user('advertiser', password='pass12345')
+        Balance.objects.create(user=self.advertiser, amount=Decimal('100.00'))
+        self.moderator = User.objects.create_user('moderator', password='pass12345')
+        self.moderator.role = User.Role.MODERATOR
+        self.moderator.save(update_fields=['role'])
+
+        self.client_adv = APIClient()
+        self.client_adv.force_authenticate(self.advertiser)
+        self.server = APIClient()
+
+    def _create_order(self, channels):
+        response = self.client_adv.post('/api/chat_ads/order/create/', {
+            'order_name': 'Чат-заказ',
+            'text': 'Текст рекламы',
+            'link': 'https://example.com',
+            'channels': channels,
+            'spm': '5.00',
+            'budget': '50.00',
+        }, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        return ChatAdOrder.objects.get()
+
+    def _search(self, channel_name):
+        return self.server.post('/api/chat_ads/order/search/',
+                                {'channel_name': channel_name, 'viewer_id': 'viewer_1'},
+                                format='json', HTTP_X_API_KEY=API_KEY)
+
+    def test_order_without_channels_is_created_and_served_anywhere(self):
+        order = self._create_order(channels='')
+        order.approve(self.moderator)
+
+        # Показывается в совершенно произвольном канале
+        response = self._search('any_random_channel')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(str(response.data['order_id']), str(order.order_id))
+
+    def test_order_with_channels_still_targets(self):
+        order = self._create_order(channels='mychan')
+        order.approve(self.moderator)
+
+        # В чужом канале не показывается, в своём — да
+        self.assertEqual(self._search('other_channel').status_code, 404)
+        self.assertEqual(self._search('mychan').status_code, 200)

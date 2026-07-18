@@ -1,4 +1,4 @@
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status, permissions
@@ -227,10 +227,12 @@ class GetChatAdView(APIView):
         channel_id = input_serializer.validated_data.get('channel_id')
 
         # 2. Поиск кандидатов (Грубая фильтрация)
-        # Мы ищем все активные заказы, где название канала упоминается в строке channels
+        # Ищем все активные заказы, где канал упоминается в channels
+        # ИЛИ channels пуст (без таргетинга — показ во всех каналах).
         # Сортируем по SPM (сначала самые дорогие)
         candidates = ChatAdOrder.objects.filter(
-            channels__icontains=channel_name,  # Может найти "news" внутри "news_sport", проверим точнее ниже
+            # icontains может найти "news" внутри "news_sport" — точная проверка ниже
+            Q(channels='') | Q(channels__icontains=channel_name),
             status=ModerationStatus.APPROVED,  # показываем только прошедшее модерацию
             is_active=True,
             completed=False,

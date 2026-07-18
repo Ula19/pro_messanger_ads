@@ -115,14 +115,9 @@ class ChatAdOrderSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.CharField())
     def validate_channels(self, value):
-        """Валидация списка каналов"""
+        """Пустой список каналов — это ок: реклама показывается во всех каналах"""
         if not value or not value.strip():
-            raise serializers.ValidationError("Необходимо указать каналы")
-
-        channels_list = [ch.strip() for ch in value.split(',') if ch.strip()]
-        if not channels_list:
-            raise serializers.ValidationError("Необходимо указать хотя бы один канал")
-
+            return ''
         return value
 
     @extend_schema_field(serializers.IntegerField())
