@@ -33,6 +33,28 @@ class MyEarningSerializer(serializers.ModelSerializer):
         return obj.get_share_rate()
 
 
+class AdminEarningSerializer(serializers.ModelSerializer):
+    """Заработок канала глазами суперадмина (админ-панель)"""
+    owner = serializers.SerializerMethodField()
+    share_rate = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChannelEarning
+        fields = [
+            'channel_id', 'channel_name', 'owner', 'claim_status', 'claimed_at',
+            'available', 'total_earned', 'total_impressions', 'share_rate', 'created_at',
+        ]
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_owner(self, obj):
+        # Владельца может не быть (канал ещё не заявлен) или его удалили
+        return obj.owner.username if obj.owner else None
+
+    @extend_schema_field(serializers.DecimalField(max_digits=4, decimal_places=3))
+    def get_share_rate(self, obj):
+        return obj.get_share_rate()
+
+
 class ClaimRequestSerializer(serializers.Serializer):
     channel_id = serializers.IntegerField(required=True)
     # Необязательная метка-имя для витрины (если клиент его знает).

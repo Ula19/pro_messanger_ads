@@ -1,15 +1,16 @@
-from django.db import transaction
+from django.db import models, transaction
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.pagination import StandardResultsSetPagination
+from apps.common.permissions import IsSuperAdmin
 from apps.common.schema import ERROR_RESPONSE, MESSAGE_RESPONSE
 from .models import ChannelEarning
 from .serializers import (
     PublicEarningSerializer, MyEarningSerializer, ClaimRequestSerializer,
-    WithdrawRequestSerializer, MessageSerializer,
+    WithdrawRequestSerializer, MessageSerializer, AdminEarningSerializer,
 )
 
 
@@ -84,6 +85,34 @@ class ClaimChannelView(APIView):
             earning.claim_by(request.user)
 
         return Response({'message': 'Канал закреплён за вами'}, status=status.HTTP_201_CREATED)
+
+
+class AdminEarningsListView(generics.ListAPIView):
+    """
+    Все заработки каналов-площадок для админ-панели. Только суперадмин.
+    Поиск ?search= по имени канала или его точному channel_id.
+    """
+    serializer_class = AdminEarningSerializer
+    permission_classes = [IsSuperAdmin]
+    pagination_class = StandardResultsSetPagination
+
+    @extend_schema(parameters=[OpenApiParameter(
+        'search', str, description='Поиск по имени канала или точному channel_id')])
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = (ChannelEarning.objects
+                    .select_related('owner')
+                    .order_by('-total_earned'))
+        search = self.request.query_params.get('search', '').strip()
+        if search:
+            # channel_id числовой — icontains по нему нельзя, ищем точное совпадение
+            filters = models.Q(channel_name__icontains=search)
+            if search.lstrip('-').isdigit():
+                filters |= models.Q(channel_id=int(search))
+            queryset = queryset.filter(filters)
+        return queryset
 
 
 class MyEarningsView(generics.ListAPIView):
